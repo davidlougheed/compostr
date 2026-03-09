@@ -1,0 +1,14 @@
+use crate::counting::MotifSequenceDecomposition;
+
+pub struct MotifSequenceConsensus {
+
+}
+
+pub fn motif_sequence_consensus(decompositions: &Vec<MotifSequenceDecomposition>) {
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+}
