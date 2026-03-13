@@ -1,4 +1,4 @@
-mod trlib;
+pub mod trlib;
 
 use crate::trlib::consensus;
 use crate::trlib::counting;
