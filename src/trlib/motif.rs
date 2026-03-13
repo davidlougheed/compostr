@@ -1,5 +1,5 @@
 pub struct MotifSet {
-    motifs: Vec<String>,
+    pub motifs: Vec<Vec<u8>>,
 }
 
 impl MotifSet {
