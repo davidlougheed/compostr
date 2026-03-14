@@ -3,9 +3,11 @@ use parasail_rs::prelude::{Aligner, Alignment, Error, Matrix};
 
 use crate::motif::MotifSet;
 
-/// TODO
+/// Structure representing a computed motif decomposition, the result of a call to MotifSequenceDecomposer.decompose().
+/// Contains the decomposition of the sequence into canonical motifs/sequence chunks + a CIGAR alignment for each
+/// decomposed element (TODO) + the final score of the decomposition (i.e., interval-schedule weight) + TODO...
 pub struct MotifSequenceDecomposition {
-    pub decomposition: Vec<Vec<u8>>,
+    pub decomposition: Vec<Vec<u8>>,  // Vector of string bytevectors right now, but this will probably change
     pub score: i32,  // Total weight achieved
 }
 
@@ -50,11 +52,9 @@ fn compute_intervals(
     Ok(intervals)
 }
 
-/// TODO
+/// Implementation of known weighted interval scheduling algorithm to do the motif decomposition
+/// See https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
 fn schedule(alignments: &Vec<(&[u8], Alignment)>, intervals: &Vec<(usize, usize, i32)>) -> (Vec<Vec<u8>>, i32) {
-    // re-use known weighted interval scheduling algorithm to do the motif decomposition
-    // https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
-
     // TODO
 
     // build up a decomposition of motifs, our "schedule"
