@@ -106,17 +106,17 @@ impl MotifSequenceDecomposer {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use super::*;
 
-    #[test]
-    fn test_decomposition() {
+    #[rstest]
+    #[case(b"CAGCAGCAGCAGCAG".to_vec(), vec!["CAG", "CAG", "CAG", "CAG", "CAG"])]
+    #[case(b"CAGCAGCGGCAGCAAG".to_vec(), vec!["CAG", "CAG", "CGG", "CAG", "CAAG"])]
+    #[case(b"CAGCAGCAAGTTCAGCCGCCGCCCG".to_vec(), vec!["CAG", "CAG", "CAAG", "T", "T", "CAG", "CCG", "CCG", "CCCG"])]
+    fn test_decomposition(#[case] seq: Vec<u8>, #[case] expected_decomp: Vec<&str>) {
         let motif_set = MotifSet::new_from_strs(&vec!["CAG", "CCG"]);
         let decomposer = MotifSequenceDecomposer::new(motif_set, 2, -7, 5);
-
-        let res1 = decomposer.decompose(b"CAGCAGCAAGTTCAGCCGCCGCCCG").unwrap();
-        assert_eq!(
-            res1.decomposition_strs().unwrap(),
-            vec!["CAG", "CAG", "CAAG", "T", "T", "CAG", "CCG", "CCG", "CCCG"]
-        );
+        let res = decomposer.decompose(seq.as_slice()).unwrap();
+        assert_eq!(res.decomposition_strs().unwrap(), expected_decomp);
     }
 }
