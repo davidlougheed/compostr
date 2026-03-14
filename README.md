@@ -26,7 +26,8 @@ As an example of how both length and motif composition can matter, consider
 [Spinocerebellar ataxia type 37](https://strchive.org/loci/sca37_dab1/), where pathogenicity comes from an alternate
 pentanucleotide motif stretch `(GAAAT)n`, rather than an expansion of the "canonical" motif `(AAAAT)n`.
 
-**Therefore**, it is important to be able to decompose a TR sequence into the motifs that compose it.
+**Therefore**, it is important to be able to decompose a TR sequence into the motifs that compose it in order to fully
+characterize a TR and its relationship to phenotype.
 
 Doing this is complicated by sequencing errors (string substitutions/insertions/deletions) and biology being messy as
 usual, meaning we may get imperfect or erroneous motif copies.
