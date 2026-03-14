@@ -21,12 +21,10 @@ impl MotifSequenceDecomposition {
 
 /// 'Machine' that decomposes repetitive, TR-esque DNA sequences using a set of provided motifs.
 pub struct MotifSequenceDecomposer {
-    // scoring parameters:  TODO: more advanced scoring/matrix
-    match_score: i32,
-    mismatch_score: i32,
-    gap_penalty: i32,
     // set of 'canonical' motifs for decomposition:
     pub motif_set: MotifSet,
+    // alignment:  TODO: more advanced scoring/matrix
+    aligner: Aligner,
 }
 
 /// Given a set of motif alignments (with scoring tables) from Parasail plus an optional scoring cutoff, this function
@@ -69,7 +67,17 @@ fn schedule(alignments: &Vec<(&[u8], Alignment)>, intervals: &Vec<(usize, usize,
 
 impl MotifSequenceDecomposer {
     pub fn new(motif_set: MotifSet, match_score: i32, mismatch_score: i32, gap_penalty: i32) -> Self {
-        MotifSequenceDecomposer { motif_set, match_score, mismatch_score, gap_penalty }
+        let matrix = Matrix::create(b"ACGT", match_score, mismatch_score).unwrap();
+        let aligner = Aligner::new()
+            .matrix(matrix)
+            .gap_open(gap_penalty)
+            .gap_extend(gap_penalty)
+            .semi_global()
+            .use_table()
+            .striped()
+            .build();
+
+        MotifSequenceDecomposer { motif_set, aligner }
     }
 
     /// TODO
@@ -79,19 +87,9 @@ impl MotifSequenceDecomposer {
         // rough algorithm outline, 3 parts:
 
         //  1: align all motifs (ends-free) to sequence to get alignment score matrix
-        let matrix = Matrix::create(b"ACGT", self.match_score, self.mismatch_score).unwrap();
-        let aligner = Aligner::new()
-            .matrix(matrix)
-            .gap_open(self.gap_penalty)
-            .gap_extend(self.gap_penalty)
-            .semi_global()
-            .use_table()
-            .striped()
-            .build();
-
         let mut alignments: Vec<(&[u8], Alignment)> = Vec::with_capacity(self.motif_set.motifs.len());
         for m in self.motif_set.motifs.iter() {
-            alignments.push((m, aligner.align(Some(m), seq)?));
+            alignments.push((m, self.aligner.align(Some(m), seq)?));
         }
 
         //  2. determine intervals using some kind of heuristic so we don't have an absurd number?
