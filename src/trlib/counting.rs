@@ -65,6 +65,8 @@ fn get_interval_from_score_matrix_start_pos(
     None
 }
 
+/// Representation of a motif alignment to a sequence.
+/// Format: start (inclusive 0-based), end (inclusive 0-based), score, alignment table index
 #[derive(Debug)]
 struct MotifAlignmentInterval(usize, usize, i32, usize);
 
