@@ -95,6 +95,23 @@ fn compute_intervals(
     Ok(intervals)
 }
 
+fn backtrack_schedule(
+    final_schedule: &mut Vec<&MotifAlignmentInterval>,
+    intervals: &Vec<& MotifAlignmentInterval>,
+    M: &Vec<i32>,
+    p: &Vec<usize>,
+    j: usize) {
+        if j == 0 {
+            return;
+        }
+        if intervals[j-1].2 + M[p[j]] >= M[j - 1] {
+            final_schedule.push(intervals[j-1]);
+            backtrack_schedule(final_schedule, intervals, M, p, p[j])
+        } else {
+            backtrack_schedule(final_schedule, intervals, M, p, j-1)
+        }
+    }
+
 /// Implementation of known weighted interval scheduling algorithm to do the motif decomposition
 /// See https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
 fn schedule(
@@ -102,14 +119,49 @@ fn schedule(
     alignments: &[(&[u8], Alignment)],
     intervals: &[MotifAlignmentInterval], // Vector of tuples (start, end, score, alignment index)
 ) -> (Vec<Vec<u8>>, i32) {
+
+    //sort intervals globally by earliest to latest end index
+    let mut s_intervals: Vec<&MotifAlignmentInterval> = Vec::new();
+    for i in intervals.iter() {
+        s_intervals.push(i);
+    }
+    s_intervals.sort_by(|x, y| x.1.cmp(&y.1));
+
+    //p[j] is the index of the latest interval that ends before interval j begins
+    let mut p = vec![0; s_intervals.len()+1];
+    for i in 1..s_intervals.len() + 1 {
+        let mut n = i - 1;
+        while n > 0 {
+            if s_intervals[n].1 < s_intervals[i-1].0 {
+                p[i] = n + 1;
+                break;
+            }
+            n -= 1;
+        }
+    }
+
+    //construct score table
+    let mut M = vec![0; s_intervals.len()+1];
+    for i in 1..s_intervals.len() + 1 {
+        let a = s_intervals[i-1].2 + M[p[i]];
+        if a > M[i-1] {
+            M[i] = a;
+        } else {
+            M[i] = M[i-1];
+        }
+    }
+
+    let mut final_schedule: Vec<&MotifAlignmentInterval> = Vec::new();
+
+    backtrack_schedule(&mut final_schedule, &s_intervals, &M, &p, s_intervals.len());
+
+    let temp_ret = Vec::new();
+
+    final_schedule.reverse();
+    eprintln!("ALEBAR - final sched = {:?}", final_schedule);
     // TODO
 
-    // build up a decomposition of motifs, our "schedule"
-    let decomposition = Vec::new();
-
-    // TODO
-
-    (decomposition, 0i32)  // TODO: real score
+    (temp_ret, M[s_intervals.len()])
 }
 
 impl MotifSequenceDecomposer {
