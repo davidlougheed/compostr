@@ -1,5 +1,5 @@
 use std::str::{self, Utf8Error};
-use parasail_rs::prelude::{Aligner, Alignment, Error, Matrix};
+use parasail_rs::prelude::{Aligner, Alignment, Error, Matrix, Table};
 
 use crate::motif::MotifSet;
 
@@ -29,6 +29,40 @@ pub struct MotifSequenceDecomposer {
     aligner: Aligner,
 }
 
+fn get_interval_from_score_matrix_start_pos(
+    tbl: &Table, start_row: usize, start_col: usize, cutoff: i32
+) -> Option<(usize, usize, i32)> {
+    let mut row = start_row;
+    let mut col = start_col;
+
+    let score = tbl.get(row, col);
+
+    if let Some(s) = score && s >= cutoff {
+        // TODO: keep alignment of motif to sequence from traceback as well.
+        while row > 0 {
+            let mut options: Vec<(usize, usize, i32)> = Vec::new();
+            if col > 0 {
+                if let Some(left) = tbl.get(row, col - 1) { options.push((row, col - 1, left)); }
+                if let Some(diag) = tbl.get(row - 1, col - 1) { options.push((row - 1, col - 1, diag)); }
+            }
+            if let Some(up) = tbl.get(row - 1, col) { options.push((row - 1, col, up)); }
+            let maxopt = options.iter().reduce(|acc, opt| if opt.2 > acc.2 { opt } else { acc } );
+
+            // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow.
+            if let Some(&mo) = maxopt {
+                row = mo.0;
+                col = mo.1;
+            } else {
+                return None  // Soemthing went wrong with score retrieval, this shouldn't happen
+            }
+        }
+
+        return Some((col, start_col, s));
+    }
+
+    None
+}
+
 /// Given a set of motif alignments (with scoring tables) from Parasail plus an optional scoring cutoff, this function
 /// creates a vector of possible motif alignment intervals in the sequence. These will then be "scheduled" to produce
 /// the sequence motif decomposition.
@@ -36,17 +70,18 @@ fn compute_intervals(
     alignments: &Vec<(&[u8], Alignment)>,
     motif_alignment_score_cutoff: Option<i32>,
     seq_len: usize,
-) -> Result<Vec<(usize, usize, i32)>, Error> {
-    let mut intervals: Vec<(usize, usize, i32)> = Vec::with_capacity(alignments.len());
-    for f in alignments.iter() {
+) -> Result<Vec<(usize, usize, i32, usize)>, Error> {
+    let mut intervals: Vec<(usize, usize, i32, usize)> = Vec::with_capacity(alignments.len());
+    let cutoff = motif_alignment_score_cutoff.unwrap_or(i32::MIN);
+    for (ai, f) in alignments.iter().enumerate() {
+        let motif_size = f.0.len() - 1;
         let tbl = f.1.get_score_table()?;
         eprintln!("{}", tbl);
 
         for i in 0..seq_len {
-            let s = tbl.get(f.0.len() - 1, i).expect("score table entry must exist");
-            if let Some(cutoff) = motif_alignment_score_cutoff && s < cutoff { continue; }
-            // TODO: do traceback
-            intervals.push((0, i, s));  // TODO: not 0 but from traceback
+            if let Some(iv) = get_interval_from_score_matrix_start_pos(&tbl, motif_size, i, cutoff) {
+                intervals.push((iv.0, iv.1, iv.2, ai));
+            }
         }
     }
     Ok(intervals)
@@ -54,7 +89,11 @@ fn compute_intervals(
 
 /// Implementation of known weighted interval scheduling algorithm to do the motif decomposition
 /// See https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
-fn schedule(alignments: &Vec<(&[u8], Alignment)>, intervals: &Vec<(usize, usize, i32)>) -> (Vec<Vec<u8>>, i32) {
+fn schedule(
+    seq: &[u8],
+    alignments: &Vec<(&[u8], Alignment)>,
+    intervals: &Vec<(usize, usize, i32, usize)>, // Vector of tuples (start, end, score, alignment index)
+) -> (Vec<Vec<u8>>, i32) {
     // TODO
 
     // build up a decomposition of motifs, our "schedule"
@@ -81,7 +120,7 @@ impl MotifSequenceDecomposer {
     }
 
     /// TODO
-    pub fn decompose<'m>(&'m self, seq: &[u8]) -> Result<MotifSequenceDecomposition, Error> {
+    pub fn decompose(&self, seq: &[u8]) -> Result<MotifSequenceDecomposition, Error> {
         let motif_alignment_score_cutoff = Some(0);
 
         // rough algorithm outline, 3 parts:
@@ -95,10 +134,11 @@ impl MotifSequenceDecomposer {
         //  2. determine intervals using some kind of heuristic so we don't have an absurd number?
         //     or just use last row(?) of the matrix as the score + figure out the interval... + do a little trimming
         let intervals = compute_intervals(&alignments, motif_alignment_score_cutoff, seq.len())?;
+        eprintln!("{:?}", intervals);
 
         //  3: use weighted interval scheduling algorithm https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
         //     to find best sequence of motifs, with any 'idle' time being non-motif DNA in between motifs.
-        let (decomposition, score) = schedule(&alignments, &intervals);
+        let (decomposition, score) = schedule(seq, &alignments, &intervals);
 
         Ok(MotifSequenceDecomposition { decomposition, score })
     }
@@ -110,7 +150,7 @@ mod tests {
     use super::*;
 
     #[rstest]
-    #[case(b"CAGCAGCAGCAGCAG".to_vec(), vec!["CAG", "CAG", "CAG", "CAG", "CAG"])]
+    #[case(b"CAGCAGCAGCAGCAGCAGCAGCAGCAG".to_vec(), vec!["CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG"])]
     #[case(b"CAGCAGCGGCAGCAAG".to_vec(), vec!["CAG", "CAG", "CGG", "CAG", "CAAG"])]
     #[case(b"CAGCAGCAAGTTCAGCCGCCGCCCG".to_vec(), vec!["CAG", "CAG", "CAAG", "T", "T", "CAG", "CCG", "CCG", "CCCG"])]
     fn test_decomposition(#[case] seq: Vec<u8>, #[case] expected_decomp: Vec<&str>) {
