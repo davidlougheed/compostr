@@ -157,7 +157,7 @@ fn schedule(
     backtrack_schedule(&mut final_schedule, &s_intervals, &M, &p, s_intervals.len());
 
     final_schedule.reverse();
-    eprintln!("ALEBAR - final sched = {:?}", final_schedule);
+    eprintln!("final sched = {:?}", final_schedule);
     // TODO
 
     (final_schedule, M[s_intervals.len()])
