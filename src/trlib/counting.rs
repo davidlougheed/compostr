@@ -12,7 +12,7 @@ pub struct MotifSequenceDecomposition {
 }
 
 impl MotifSequenceDecomposition {
-    pub fn decomposition_strs<'m>(&'m self) -> Result<Vec<&'m str>, Utf8Error> {
+    pub fn decomposition_strs(&self) -> Result<Vec<&str>, Utf8Error> {
         let mut res = Vec::with_capacity(self.decomposition.len());
         for m in self.decomposition.iter() {
             res.push(str::from_utf8(m)?);
@@ -75,7 +75,7 @@ struct MotifAlignmentInterval(usize, usize, i32, usize);
 /// creates a vector of possible motif alignment intervals in the sequence. These will then be "scheduled" to produce
 /// the sequence motif decomposition.
 fn compute_intervals(
-    alignments: &Vec<(&[u8], Alignment)>,
+    alignments: &[(&[u8], Alignment)],
     motif_alignment_score_cutoff: Option<i32>,
     seq_len: usize,
 ) -> Result<Vec<MotifAlignmentInterval>, Error> {
@@ -99,8 +99,8 @@ fn compute_intervals(
 /// See https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
 fn schedule(
     seq: &[u8],
-    alignments: &Vec<(&[u8], Alignment)>,
-    intervals: &Vec<MotifAlignmentInterval>, // Vector of tuples (start, end, score, alignment index)
+    alignments: &[(&[u8], Alignment)],
+    intervals: &[MotifAlignmentInterval], // Vector of tuples (start, end, score, alignment index)
 ) -> (Vec<Vec<u8>>, i32) {
     // TODO
 

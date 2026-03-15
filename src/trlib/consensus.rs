@@ -4,7 +4,7 @@ pub struct MotifSequenceConsensus {
 
 }
 
-pub fn motif_sequence_consensus(decompositions: &Vec<MotifSequenceDecomposition>) {
+pub fn motif_sequence_consensus(decompositions: &[MotifSequenceDecomposition]) {
 
 }
 
