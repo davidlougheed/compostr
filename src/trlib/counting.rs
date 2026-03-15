@@ -27,6 +27,8 @@ pub struct MotifSequenceDecomposer {
     pub motif_set: MotifSet,
     // alignment:  TODO: more advanced scoring/matrix
     aligner: Aligner,
+    // interval computation parameters
+    motif_alignment_score_cutoff: Option<i32>,
 }
 
 fn get_interval_from_score_matrix_start_pos(
@@ -105,7 +107,13 @@ fn schedule(
 }
 
 impl MotifSequenceDecomposer {
-    pub fn new(motif_set: MotifSet, match_score: i32, mismatch_score: i32, gap_penalty: i32) -> Self {
+    pub fn new(
+        motif_set: MotifSet,
+        match_score: i32,
+        mismatch_score: i32,
+        gap_penalty: i32,
+        motif_alignment_score_cutoff: Option<i32>,
+    ) -> Self {
         let matrix = Matrix::create(b"ACGT", match_score, mismatch_score).unwrap();
         let aligner = Aligner::new()
             .matrix(matrix)
@@ -116,13 +124,11 @@ impl MotifSequenceDecomposer {
             .striped()
             .build();
 
-        MotifSequenceDecomposer { motif_set, aligner }
+        MotifSequenceDecomposer { motif_set, aligner, motif_alignment_score_cutoff }
     }
 
     /// TODO
     pub fn decompose(&self, seq: &[u8]) -> Result<MotifSequenceDecomposition, Error> {
-        let motif_alignment_score_cutoff = Some(0);
-
         // rough algorithm outline, 3 parts:
 
         //  1: align all motifs (ends-free) to sequence to get alignment score matrix
@@ -133,7 +139,7 @@ impl MotifSequenceDecomposer {
 
         //  2. determine intervals using some kind of heuristic so we don't have an absurd number?
         //     or just use last row(?) of the matrix as the score + figure out the interval... + do a little trimming
-        let intervals = compute_intervals(&alignments, motif_alignment_score_cutoff, seq.len())?;
+        let intervals = compute_intervals(&alignments, self.motif_alignment_score_cutoff, seq.len())?;
         eprintln!("{:?}", intervals);
 
         //  3: use weighted interval scheduling algorithm https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
@@ -155,7 +161,7 @@ mod tests {
     #[case(b"CAGCAGCAAGTTCAGCCGCCGCCCG".to_vec(), vec!["CAG", "CAG", "CAAG", "T", "T", "CAG", "CCG", "CCG", "CCCG"])]
     fn test_decomposition(#[case] seq: Vec<u8>, #[case] expected_decomp: Vec<&str>) {
         let motif_set = MotifSet::new_from_strs(&vec!["CAG", "CCG"]);
-        let decomposer = MotifSequenceDecomposer::new(motif_set, 2, -7, 5);
+        let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, Some(1));
         let res = decomposer.decompose(seq.as_slice()).unwrap();
         assert_eq!(res.decomposition_strs().unwrap(), expected_decomp);
     }
