@@ -7,7 +7,7 @@ use crate::motif::MotifSet;
 /// Contains the decomposition of the sequence into canonical motifs/sequence chunks + a CIGAR alignment for each
 /// decomposed element (TODO) + the final score of the decomposition (i.e., interval-schedule weight) + TODO...
 pub struct MotifSequenceDecomposition {
-    pub decomposition: Vec<Vec<u8>>,  // Vector of string bytevectors right now, but this will probably change
+    pub decomposition: Vec<MotifAlignmentInterval>,
     pub score: i32,  // Total weight achieved
 }
 
@@ -15,7 +15,7 @@ impl MotifSequenceDecomposition {
     pub fn decomposition_strs(&self) -> Result<Vec<&str>, Utf8Error> {
         let mut res = Vec::with_capacity(self.decomposition.len());
         for m in self.decomposition.iter() {
-            res.push(str::from_utf8(m)?);
+            //res.push(str::from_utf8(m.3)?);
         }
         Ok(res)
     }
@@ -96,7 +96,7 @@ fn compute_intervals(
 }
 
 fn backtrack_schedule(
-    final_schedule: &mut Vec<&MotifAlignmentInterval>,
+    final_schedule: &mut Vec<MotifAlignmentInterval>,
     intervals: &Vec<& MotifAlignmentInterval>,
     M: &Vec<i32>,
     p: &Vec<usize>,
@@ -105,7 +105,8 @@ fn backtrack_schedule(
             return;
         }
         if intervals[j-1].2 + M[p[j]] >= M[j - 1] {
-            final_schedule.push(intervals[j-1]);
+            let temp: MotifAlignmentInterval = MotifAlignmentInterval(intervals[j-1].0, intervals[j-1].1, intervals[j-1].2, intervals[j-1].3);
+            final_schedule.push(temp);
             backtrack_schedule(final_schedule, intervals, M, p, p[j])
         } else {
             backtrack_schedule(final_schedule, intervals, M, p, j-1)
@@ -118,7 +119,7 @@ fn schedule(
     seq: &[u8],
     alignments: &[(&[u8], Alignment)],
     intervals: &[MotifAlignmentInterval], // Vector of tuples (start, end, score, alignment index)
-) -> (Vec<Vec<u8>>, i32) {
+) -> (Vec<MotifAlignmentInterval>, i32) {
 
     //sort intervals globally by earliest to latest end index
     let mut s_intervals: Vec<&MotifAlignmentInterval> = Vec::new();
@@ -151,17 +152,15 @@ fn schedule(
         }
     }
 
-    let mut final_schedule: Vec<&MotifAlignmentInterval> = Vec::new();
+    let mut final_schedule: Vec<MotifAlignmentInterval> = Vec::new();
 
     backtrack_schedule(&mut final_schedule, &s_intervals, &M, &p, s_intervals.len());
-
-    let temp_ret = Vec::new();
 
     final_schedule.reverse();
     eprintln!("ALEBAR - final sched = {:?}", final_schedule);
     // TODO
 
-    (temp_ret, M[s_intervals.len()])
+    (final_schedule, M[s_intervals.len()])
 }
 
 impl MotifSequenceDecomposer {
