@@ -65,6 +65,9 @@ fn get_interval_from_score_matrix_start_pos(
     None
 }
 
+#[derive(Debug)]
+struct MotifAlignmentInterval(usize, usize, i32, usize);
+
 /// Given a set of motif alignments (with scoring tables) from Parasail plus an optional scoring cutoff, this function
 /// creates a vector of possible motif alignment intervals in the sequence. These will then be "scheduled" to produce
 /// the sequence motif decomposition.
@@ -72,8 +75,8 @@ fn compute_intervals(
     alignments: &Vec<(&[u8], Alignment)>,
     motif_alignment_score_cutoff: Option<i32>,
     seq_len: usize,
-) -> Result<Vec<(usize, usize, i32, usize)>, Error> {
-    let mut intervals: Vec<(usize, usize, i32, usize)> = Vec::with_capacity(alignments.len());
+) -> Result<Vec<MotifAlignmentInterval>, Error> {
+    let mut intervals: Vec<MotifAlignmentInterval> = Vec::with_capacity(alignments.len());
     let cutoff = motif_alignment_score_cutoff.unwrap_or(i32::MIN);
     for (ai, f) in alignments.iter().enumerate() {
         let motif_size = f.0.len() - 1;
@@ -82,7 +85,7 @@ fn compute_intervals(
 
         for i in 0..seq_len {
             if let Some(iv) = get_interval_from_score_matrix_start_pos(&tbl, motif_size, i, cutoff) {
-                intervals.push((iv.0, iv.1, iv.2, ai));
+                intervals.push(MotifAlignmentInterval(iv.0, iv.1, iv.2, ai));
             }
         }
     }
@@ -94,7 +97,7 @@ fn compute_intervals(
 fn schedule(
     seq: &[u8],
     alignments: &Vec<(&[u8], Alignment)>,
-    intervals: &Vec<(usize, usize, i32, usize)>, // Vector of tuples (start, end, score, alignment index)
+    intervals: &Vec<MotifAlignmentInterval>, // Vector of tuples (start, end, score, alignment index)
 ) -> (Vec<Vec<u8>>, i32) {
     // TODO
 
