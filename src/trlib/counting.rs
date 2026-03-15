@@ -31,11 +31,12 @@ pub struct MotifSequenceDecomposer {
     motif_alignment_score_cutoff: Option<i32>,
 }
 
+/// Given a motif-sequence alignment table and an ending row/col for an alignment, trace back the alignment to return
+/// an interval tuple of: (starting sequence position, ending sequence position, score)
 fn get_interval_from_score_matrix_start_pos(
-    tbl: &Table, start_row: usize, start_col: usize, cutoff: i32
+    tbl: &Table, mut row: usize, end_col: usize, cutoff: i32
 ) -> Option<(usize, usize, i32)> {
-    let mut row = start_row;
-    let mut col = start_col;
+    let mut col = end_col;
 
     let score = tbl.get(row, col);
 
@@ -59,7 +60,7 @@ fn get_interval_from_score_matrix_start_pos(
             }
         }
 
-        return Some((col, start_col, s));
+        return Some((col, end_col, s));
     }
 
     None
