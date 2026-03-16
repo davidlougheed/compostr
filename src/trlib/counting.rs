@@ -69,6 +69,7 @@ fn get_interval_from_score_matrix_start_pos(
 /// Representation of a motif alignment to a sequence.
 /// Format: start (inclusive 0-based), end (inclusive 0-based), score, alignment table index
 #[derive(Debug)]
+#[derive(Clone)]
 struct MotifAlignmentInterval(usize, usize, i32, usize);
 
 /// Given a set of motif alignments (with scoring tables) from Parasail plus an optional scoring cutoff, this function
@@ -97,19 +98,20 @@ fn compute_intervals(
 
 fn backtrack_schedule(
     final_schedule: &mut Vec<MotifAlignmentInterval>,
-    intervals: &Vec<& MotifAlignmentInterval>,
-    M: &Vec<i32>,
+    intervals: &Vec<&MotifAlignmentInterval>,
+    m: &Vec<i32>,
     p: &Vec<usize>,
-    j: usize) {
+    j: usize,
+) {
         if j == 0 {
             return;
         }
-        if intervals[j-1].2 + M[p[j]] >= M[j - 1] {
-            let temp: MotifAlignmentInterval = MotifAlignmentInterval(intervals[j-1].0, intervals[j-1].1, intervals[j-1].2, intervals[j-1].3);
+        if intervals[j-1].2 + m[p[j]] >= m[j - 1] {
+            let temp: MotifAlignmentInterval = intervals[j-1].clone();
             final_schedule.push(temp);
-            backtrack_schedule(final_schedule, intervals, M, p, p[j])
+            backtrack_schedule(final_schedule, intervals, m, p, p[j])
         } else {
-            backtrack_schedule(final_schedule, intervals, M, p, j-1)
+            backtrack_schedule(final_schedule, intervals, m, p, j-1)
         }
     }
 
@@ -142,25 +144,25 @@ fn schedule(
     }
 
     //construct score table
-    let mut M = vec![0; s_intervals.len()+1];
+    let mut m = vec![0; s_intervals.len()+1];
     for i in 1..s_intervals.len() + 1 {
-        let a = s_intervals[i-1].2 + M[p[i]];
-        if a > M[i-1] {
-            M[i] = a;
+        let a = s_intervals[i-1].2 + m[p[i]];
+        if a > m[i-1] {
+            m[i] = a;
         } else {
-            M[i] = M[i-1];
+            m[i] = m[i-1];
         }
     }
 
     let mut final_schedule: Vec<MotifAlignmentInterval> = Vec::new();
 
-    backtrack_schedule(&mut final_schedule, &s_intervals, &M, &p, s_intervals.len());
+    backtrack_schedule(&mut final_schedule, &s_intervals, &m, &p, s_intervals.len());
 
     final_schedule.reverse();
     eprintln!("final sched = {:?}", final_schedule);
     // TODO
 
-    (final_schedule, M[s_intervals.len()])
+    (final_schedule, m[s_intervals.len()])
 }
 
 impl MotifSequenceDecomposer {
