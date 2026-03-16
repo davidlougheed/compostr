@@ -130,7 +130,7 @@ fn schedule(
     }
     s_intervals.sort_by(|x, y| x.1.cmp(&y.1));
 
-    //p[j] is the index of the latest interval that ends before interval j begins
+    // p[j] is the index of the latest interval that ends before interval j begins
     let mut p = vec![0; s_intervals.len()+1];
     for i in 1..s_intervals.len() + 1 {
         let mut n = i - 1;
@@ -159,8 +159,6 @@ fn schedule(
     backtrack_schedule(&mut final_schedule, &s_intervals, &m, &p, s_intervals.len());
 
     final_schedule.reverse();
-    eprintln!("final sched = {:?}", final_schedule);
-    // TODO
 
     (final_schedule, m[s_intervals.len()])
 }
@@ -207,6 +205,15 @@ impl MotifSequenceDecomposer {
 
         Ok(MotifSequenceDecomposition { decomposition, score })
     }
+
+    pub fn decomp_to_str(&self, decomp: MotifSequenceDecomposition) -> Result<Vec<&str>, Utf8Error> {
+        let mut return_vec = Vec::new();
+        for i in decomp.decomposition.iter() {
+            let decomp_str: &str = str::from_utf8(self.motif_set.motifs[i.3].as_slice())?;
+            return_vec.push(decomp_str);
+        }
+        Ok(return_vec)
+    }
 }
 
 #[cfg(test)]
@@ -222,6 +229,6 @@ mod tests {
         let motif_set = MotifSet::new_from_strs(&vec!["CAG", "CCG"]);
         let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, Some(1));
         let res = decomposer.decompose(seq.as_slice()).unwrap();
-        assert_eq!(res.decomposition_strs().unwrap(), expected_decomp);
+        assert_eq!(decomposer.decomp_to_str(res).unwrap(), expected_decomp);
     }
 }
