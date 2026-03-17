@@ -18,5 +18,6 @@ jobs:
         with:
           toolchain: 1.88.0
           rustflags: ""
+          components: clippy
       - name: Clippy
         run: cargo clippy -- -D warnings
