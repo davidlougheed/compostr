@@ -7,7 +7,7 @@ use crate::motif::MotifSet;
 /// Contains the decomposition of the sequence into canonical motifs/sequence chunks + a CIGAR alignment for each
 /// decomposed element (TODO) + the final score of the decomposition (i.e., interval-schedule weight) + TODO...
 pub struct MotifSequenceDecomposition {
-    pub decomposition: Vec<Vec<u8>>,  // Vector of string bytevectors right now, but this will probably change
+    pub decomposition: Vec<MotifAlignmentInterval>,
     pub score: i32,  // Total weight achieved
 }
 
@@ -15,7 +15,7 @@ impl MotifSequenceDecomposition {
     pub fn decomposition_strs(&self) -> Result<Vec<&str>, Utf8Error> {
         let mut res = Vec::with_capacity(self.decomposition.len());
         for m in self.decomposition.iter() {
-            res.push(str::from_utf8(m)?);
+            //res.push(str::from_utf8(m.3)?);
         }
         Ok(res)
     }
@@ -69,6 +69,7 @@ fn get_interval_from_score_matrix_start_pos(
 /// Representation of a motif alignment to a sequence.
 /// Format: start (inclusive 0-based), end (inclusive 0-based), score, alignment table index
 #[derive(Debug)]
+#[derive(Clone)]
 struct MotifAlignmentInterval(usize, usize, i32, usize);
 
 /// Given a set of motif alignments (with scoring tables) from Parasail plus an optional scoring cutoff, this function
@@ -95,21 +96,71 @@ fn compute_intervals(
     Ok(intervals)
 }
 
+fn backtrack_schedule(
+    final_schedule: &mut Vec<MotifAlignmentInterval>,
+    intervals: &Vec<&MotifAlignmentInterval>,
+    m: &Vec<i32>,
+    p: &Vec<usize>,
+    j: usize,
+) {
+        if j == 0 {
+            return;
+        }
+        if intervals[j-1].2 + m[p[j]] >= m[j - 1] {
+            let temp: MotifAlignmentInterval = intervals[j-1].clone();
+            final_schedule.push(temp);
+            backtrack_schedule(final_schedule, intervals, m, p, p[j])
+        } else {
+            backtrack_schedule(final_schedule, intervals, m, p, j-1)
+        }
+    }
+
 /// Implementation of known weighted interval scheduling algorithm to do the motif decomposition
 /// See https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
 fn schedule(
     seq: &[u8],
     alignments: &[(&[u8], Alignment)],
     intervals: &[MotifAlignmentInterval], // Vector of tuples (start, end, score, alignment index)
-) -> (Vec<Vec<u8>>, i32) {
-    // TODO
+) -> (Vec<MotifAlignmentInterval>, i32) {
 
-    // build up a decomposition of motifs, our "schedule"
-    let decomposition = Vec::new();
+    //sort intervals globally by earliest to latest end index
+    let mut s_intervals: Vec<&MotifAlignmentInterval> = Vec::new();
+    for i in intervals.iter() {
+        s_intervals.push(i);
+    }
+    s_intervals.sort_by(|x, y| x.1.cmp(&y.1));
 
-    // TODO
+    // p[j] is the index of the latest interval that ends before interval j begins
+    let mut p = vec![0; s_intervals.len()+1];
+    for i in 1..s_intervals.len() + 1 {
+        let mut n = i - 1;
+        while n > 0 {
+            if s_intervals[n].1 < s_intervals[i-1].0 {
+                p[i] = n + 1;
+                break;
+            }
+            n -= 1;
+        }
+    }
 
-    (decomposition, 0i32)  // TODO: real score
+    //construct score table
+    let mut m = vec![0; s_intervals.len()+1];
+    for i in 1..s_intervals.len() + 1 {
+        let a = s_intervals[i-1].2 + m[p[i]];
+        if a > m[i-1] {
+            m[i] = a;
+        } else {
+            m[i] = m[i-1];
+        }
+    }
+
+    let mut final_schedule: Vec<MotifAlignmentInterval> = Vec::new();
+
+    backtrack_schedule(&mut final_schedule, &s_intervals, &m, &p, s_intervals.len());
+
+    final_schedule.reverse();
+
+    (final_schedule, m[s_intervals.len()])
 }
 
 impl MotifSequenceDecomposer {
@@ -154,6 +205,15 @@ impl MotifSequenceDecomposer {
 
         Ok(MotifSequenceDecomposition { decomposition, score })
     }
+
+    pub fn decomp_to_str(&self, decomp: MotifSequenceDecomposition) -> Result<Vec<&str>, Utf8Error> {
+        let mut return_vec = Vec::new();
+        for i in decomp.decomposition.iter() {
+            let decomp_str: &str = str::from_utf8(self.motif_set.motifs[i.3].as_slice())?;
+            return_vec.push(decomp_str);
+        }
+        Ok(return_vec)
+    }
 }
 
 #[cfg(test)]
@@ -169,6 +229,6 @@ mod tests {
         let motif_set = MotifSet::new_from_strs(&vec!["CAG", "CCG"]);
         let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, Some(1));
         let res = decomposer.decompose(seq.as_slice()).unwrap();
-        assert_eq!(res.decomposition_strs().unwrap(), expected_decomp);
+        assert_eq!(decomposer.decomp_to_str(res).unwrap(), expected_decomp);
     }
 }
