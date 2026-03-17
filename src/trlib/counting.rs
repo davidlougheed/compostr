@@ -124,10 +124,7 @@ fn schedule(
 ) -> (Vec<MotifAlignmentInterval>, i32) {
 
     //sort intervals globally by earliest to latest end index
-    let mut s_intervals: Vec<&MotifAlignmentInterval> = Vec::new();
-    for i in intervals.iter() {
-        s_intervals.push(i);
-    }
+    let mut s_intervals: Vec<&MotifAlignmentInterval> = intervals.iter().collect();
     s_intervals.sort_by(|x, y| x.1.cmp(&y.1));
 
     // p[j] is the index of the latest interval that ends before interval j begins
