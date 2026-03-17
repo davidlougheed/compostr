@@ -103,17 +103,17 @@ fn backtrack_schedule(
     p: &Vec<usize>,
     j: usize,
 ) {
-        if j == 0 {
-            return;
-        }
-        if intervals[j-1].2 + m[p[j]] >= m[j - 1] {
-            let temp: MotifAlignmentInterval = intervals[j-1].clone();
-            final_schedule.push(temp);
-            backtrack_schedule(final_schedule, intervals, m, p, p[j])
-        } else {
-            backtrack_schedule(final_schedule, intervals, m, p, j-1)
-        }
+    if j == 0 {
+        return;
     }
+    if intervals[j-1].2 + m[p[j]] >= m[j - 1] {
+        let temp: MotifAlignmentInterval = intervals[j-1].clone();
+        final_schedule.push(temp);
+        backtrack_schedule(final_schedule, intervals, m, p, p[j])
+    } else {
+        backtrack_schedule(final_schedule, intervals, m, p, j-1)
+    }
+}
 
 /// Implementation of known weighted interval scheduling algorithm to do the motif decomposition
 /// See https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
@@ -184,7 +184,8 @@ impl MotifSequenceDecomposer {
         MotifSequenceDecomposer { motif_set, aligner, motif_alignment_score_cutoff }
     }
 
-    /// TODO
+    /// Main functionality for MotifSequenceDecomposer - given a sequence, decomposes it into motifs using the motif
+    /// set and alignment parameters that were specified for the decomposer instance.
     pub fn decompose(&self, seq: &[u8]) -> Result<MotifSequenceDecomposition, Error> {
         // rough algorithm outline, 3 parts:
 
