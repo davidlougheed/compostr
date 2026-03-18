@@ -67,11 +67,8 @@ fn backtrack_schedule(
 
 /// Implementation of known weighted interval scheduling algorithm to do the motif decomposition
 /// See https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
-fn schedule(
-    seq: &[u8],
-    alignments: &[(&[u8], Alignment)],
-    intervals: &[MotifAlignmentInterval], // Vector of tuples (start, end, score, alignment index)
-) -> (Vec<MotifAlignmentInterval>, i32) {
+/// Returns the best (or one of the best) schedules + its score.
+fn schedule(intervals: &[MotifAlignmentInterval]) -> (Vec<MotifAlignmentInterval>, i32) {
     // sort intervals globally by earliest to latest end index
     let mut s_intervals: Vec<&MotifAlignmentInterval> = intervals.iter().collect();
     s_intervals.sort_by(|x, y| x.end.cmp(&y.end));
@@ -90,7 +87,7 @@ fn schedule(
         }
     }
 
-    //construct score table
+    // construct score table
     let mut m = vec![0; s_intervals.len() + 1];
     for i in 1..s_intervals.len() + 1 {
         let a = s_intervals[i - 1].score + m[p[i]];
@@ -116,6 +113,15 @@ enum AlignmentItem {
     Mismatch,
 }
 
+fn alignment_item_to_cigar_char(op: &AlignmentItem) -> char {
+    match op {
+        AlignmentItem::Ins => 'I',
+        AlignmentItem::Del => 'D',
+        AlignmentItem::Match => '=',
+        AlignmentItem::Mismatch => 'X',
+    }
+}
+
 fn alignment_items_to_cigar(items: &[AlignmentItem]) -> String {
     let mut cigar = String::new();
     let mut ii = items.iter();
@@ -126,17 +132,7 @@ fn alignment_items_to_cigar(items: &[AlignmentItem]) -> String {
             if op == current_op {
                 current_count += 1;
             } else {
-                cigar = format!(
-                    "{}{}{}",
-                    cigar,
-                    current_count,
-                    match current_op {
-                        AlignmentItem::Ins => "I",
-                        AlignmentItem::Del => "D",
-                        AlignmentItem::Match => "=",
-                        AlignmentItem::Mismatch => "X",
-                    }
-                );
+                cigar = format!("{}{}{}", cigar, current_count, alignment_item_to_cigar_char(current_op));
                 current_op = op;
                 current_count = 0;
             }
@@ -175,7 +171,8 @@ impl MotifSequenceDecomposer {
     }
 
     /// Given a motif-sequence alignment table and an ending row/col for an alignment, trace back the alignment to return
-    /// an interval tuple of: (starting sequence position, ending sequence position, score)
+    /// an interval tuple of: (starting sequence position, ending sequence position, score, CIGAR for the interval).
+    /// This tuple will be used to build a MotifAlignmentInterval struct downstream.
     fn get_interval_from_score_matrix_start_pos(
         &self,
         seq: &[u8],
@@ -285,7 +282,7 @@ impl MotifSequenceDecomposer {
 
         //  3: use weighted interval scheduling algorithm https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
         //     to find best sequence of motifs, with any 'idle' time being non-motif DNA in between motifs.
-        let (decomposition, score) = schedule(seq, &alignments, &intervals);
+        let (decomposition, score) = schedule(&intervals);
 
         Ok(MotifSequenceDecomposition { decomposition, score })
     }
