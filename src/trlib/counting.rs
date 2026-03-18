@@ -113,12 +113,14 @@ enum AlignmentItem {
     Mismatch,
 }
 
-fn alignment_item_to_cigar_char(op: &AlignmentItem) -> char {
-    match op {
-        AlignmentItem::Ins => 'I',
-        AlignmentItem::Del => 'D',
-        AlignmentItem::Match => '=',
-        AlignmentItem::Mismatch => 'X',
+impl AlignmentItem {
+    fn to_cigar_char(&self) -> char {
+        match self {
+            AlignmentItem::Ins => 'I',
+            AlignmentItem::Del => 'D',
+            AlignmentItem::Match => '=',
+            AlignmentItem::Mismatch => 'X',
+        }
     }
 }
 
@@ -132,7 +134,7 @@ fn alignment_items_to_cigar(items: &[AlignmentItem]) -> String {
             if op == current_op {
                 current_count += 1;
             } else {
-                cigar = format!("{}{}{}", cigar, current_count, alignment_item_to_cigar_char(current_op));
+                cigar = format!("{}{}{}", cigar, current_count, current_op.to_cigar_char());
                 current_op = op;
                 current_count = 0;
             }
