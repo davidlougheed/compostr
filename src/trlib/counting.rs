@@ -1,6 +1,6 @@
+use parasail_rs::prelude::{Aligner, Alignment, Error, Matrix, Table};
 use std::cmp;
 use std::str::{self, Utf8Error};
-use parasail_rs::prelude::{Aligner, Alignment, Error, Matrix, Table};
 
 use crate::motif::MotifSet;
 
@@ -9,7 +9,7 @@ use crate::motif::MotifSet;
 /// decomposed element (TODO) + the final score of the decomposition (i.e., interval-schedule weight) + TODO...
 pub struct MotifSequenceDecomposition {
     pub decomposition: Vec<MotifAlignmentInterval>,
-    pub score: i32,  // Total weight achieved
+    pub score: i32, // Total weight achieved
 }
 
 impl MotifSequenceDecomposition {
@@ -56,12 +56,12 @@ fn backtrack_schedule(
     if j == 0 {
         return;
     }
-    if intervals[j-1].score + m[p[j]] >= m[j - 1] {
-        let temp: MotifAlignmentInterval = intervals[j-1].clone();
+    if intervals[j - 1].score + m[p[j]] >= m[j - 1] {
+        let temp: MotifAlignmentInterval = intervals[j - 1].clone();
         final_schedule.push(temp);
         backtrack_schedule(final_schedule, intervals, m, p, p[j])
     } else {
-        backtrack_schedule(final_schedule, intervals, m, p, j-1)
+        backtrack_schedule(final_schedule, intervals, m, p, j - 1)
     }
 }
 
@@ -72,17 +72,17 @@ fn schedule(
     alignments: &[(&[u8], Alignment)],
     intervals: &[MotifAlignmentInterval], // Vector of tuples (start, end, score, alignment index)
 ) -> (Vec<MotifAlignmentInterval>, i32) {
-
     // sort intervals globally by earliest to latest end index
     let mut s_intervals: Vec<&MotifAlignmentInterval> = intervals.iter().collect();
     s_intervals.sort_by(|x, y| x.end.cmp(&y.end));
 
     // p[j] is the index of the latest interval that ends before interval j begins
-    let mut p = vec![0; s_intervals.len()+1];
+    let mut p = vec![0; s_intervals.len() + 1];
     for i in 1..s_intervals.len() + 1 {
         let mut n = i - 1;
         while n > 0 {
-            if s_intervals[n].end < s_intervals[i-1].start { // interval coordinates are inclusive, so use '<'
+            if s_intervals[n].end < s_intervals[i - 1].start {
+                // interval coordinates are inclusive, so use '<'
                 p[i] = n + 1;
                 break;
             }
@@ -91,10 +91,10 @@ fn schedule(
     }
 
     //construct score table
-    let mut m = vec![0; s_intervals.len()+1];
+    let mut m = vec![0; s_intervals.len() + 1];
     for i in 1..s_intervals.len() + 1 {
-        let a = s_intervals[i-1].score + m[p[i]];
-        m[i] = cmp::max(a, m[i-1]);
+        let a = s_intervals[i - 1].score + m[p[i]];
+        m[i] = cmp::max(a, m[i - 1]);
     }
 
     let mut final_schedule: Vec<MotifAlignmentInterval> = Vec::new();
@@ -126,12 +126,17 @@ fn alignment_items_to_cigar(items: &[AlignmentItem]) -> String {
             if op == current_op {
                 current_count += 1;
             } else {
-                cigar = format!("{}{}{}", cigar, current_count, match current_op {
-                    AlignmentItem::Ins => "I",
-                    AlignmentItem::Del => "D",
-                    AlignmentItem::Match => "=",
-                    AlignmentItem::Mismatch => "X",
-                });
+                cigar = format!(
+                    "{}{}{}",
+                    cigar,
+                    current_count,
+                    match current_op {
+                        AlignmentItem::Ins => "I",
+                        AlignmentItem::Del => "D",
+                        AlignmentItem::Match => "=",
+                        AlignmentItem::Mismatch => "X",
+                    }
+                );
                 current_op = op;
                 current_count = 0;
             }
@@ -160,20 +165,33 @@ impl MotifSequenceDecomposer {
             .build();
 
         MotifSequenceDecomposer {
-            motif_set, match_score, mismatch_score, gap_penalty, aligner, motif_alignment_score_cutoff
+            motif_set,
+            match_score,
+            mismatch_score,
+            gap_penalty,
+            aligner,
+            motif_alignment_score_cutoff,
         }
     }
 
     /// Given a motif-sequence alignment table and an ending row/col for an alignment, trace back the alignment to return
     /// an interval tuple of: (starting sequence position, ending sequence position, score)
     fn get_interval_from_score_matrix_start_pos(
-        &self, seq: &[u8], motif: &[u8], tbl: &Table, mut row: usize, end_col: usize, cutoff: i32
+        &self,
+        seq: &[u8],
+        motif: &[u8],
+        tbl: &Table,
+        mut row: usize,
+        end_col: usize,
+        cutoff: i32,
     ) -> Option<(usize, usize, i32, String)> {
         let mut col = end_col;
 
         let score = tbl.get(row, col);
 
-        if let Some(s) = score && s >= cutoff {
+        if let Some(s) = score
+            && s >= cutoff
+        {
             // keep alignment of motif to sequence from traceback as well:
             let mut motif_alignment: Vec<AlignmentItem> = Vec::new();
 
@@ -194,8 +212,10 @@ impl MotifSequenceDecomposer {
                     }
                 }
                 // TODO: this doesn't support affine gap properly
-                if let Some(up) = tbl.get(row - 1, col) { options.push((row - 1, col, up  - self.gap_penalty, AlignmentItem::Del)); }
-                let maxopt = options.iter().reduce(|acc, opt| if opt.2 > acc.2 { opt } else { acc } );
+                if let Some(up) = tbl.get(row - 1, col) {
+                    options.push((row - 1, col, up - self.gap_penalty, AlignmentItem::Del));
+                }
+                let maxopt = options.iter().reduce(|acc, opt| if opt.2 > acc.2 { opt } else { acc });
 
                 // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow.
                 if let Some(mo) = maxopt {
@@ -203,7 +223,7 @@ impl MotifSequenceDecomposer {
                     col = mo.1;
                     motif_alignment.push(mo.3.clone());
                 } else {
-                    return None  // Something went wrong with score retrieval, this shouldn't happen
+                    return None; // Something went wrong with score retrieval, this shouldn't happen
                 }
             }
 
@@ -282,8 +302,8 @@ impl MotifSequenceDecomposer {
 
 #[cfg(test)]
 mod tests {
-    use rstest::rstest;
     use super::*;
+    use rstest::rstest;
 
     #[rstest]
     #[case(b"CAGCAGCAGCAGCAGCAGCAGCAGCAG".to_vec(), vec!["CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG"])]

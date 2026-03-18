@@ -23,7 +23,12 @@ pub struct Aligner {
 
 impl Aligner {
     pub fn new(match_score: i32, mismatch_score: i32, gap_open: i32, gap_extend: i32) -> Self {
-        Aligner { match_score, mismatch_score, gap_open, gap_extend }
+        Aligner {
+            match_score,
+            mismatch_score,
+            gap_open,
+            gap_extend,
+        }
     }
 
     pub fn align_motif_to_seq(motif: &[u8], seq: &[u8]) -> Alignment {
@@ -43,6 +48,6 @@ impl Aligner {
 
 #[cfg(test)]
 mod tests {
-    use rstest::rstest;
     use super::*;
+    use rstest::rstest;
 }

@@ -18,6 +18,8 @@ jobs:
         with:
           toolchain: 1.88.0
           rustflags: ""
-          components: clippy
+          components: clippy rustfmt
       - name: Clippy
         run: cargo clippy -- -D warnings
+      - name: Format
+        run: cargo fmt --check
