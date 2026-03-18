@@ -254,7 +254,7 @@ impl MotifSequenceDecomposer {
             eprintln!("scr {}", tbl);
 
             intervals.extend((0..seq_len).filter_map(|i| {
-                self.get_interval_from_score_matrix_start_pos(&seq, &f.0, &tbl, motif_size, i, cutoff)
+                self.get_interval_from_score_matrix_start_pos(seq, f.0, &tbl, motif_size, i, cutoff)
                     .map(|iv| MotifAlignmentInterval {
                         start: iv.0,
                         end: iv.1,
@@ -280,7 +280,7 @@ impl MotifSequenceDecomposer {
 
         //  2. determine intervals using some kind of heuristic so we don't have an absurd number?
         //     or just use last row(?) of the matrix as the score + figure out the interval... + do a little trimming
-        let intervals = self.compute_intervals(&seq, &alignments, self.motif_alignment_score_cutoff, seq.len())?;
+        let intervals = self.compute_intervals(seq, &alignments, self.motif_alignment_score_cutoff, seq.len())?;
         eprintln!("{:?}", intervals);
 
         //  3: use weighted interval scheduling algorithm https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
