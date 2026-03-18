@@ -93,12 +93,8 @@ fn schedule(
     //construct score table
     let mut m = vec![0; s_intervals.len()+1];
     for i in 1..s_intervals.len() + 1 {
-        let a = s_intervals[i-1].2 + m[p[i]];
-        if a > m[i-1] {
-            m[i] = a;
-        } else {
-            m[i] = m[i-1];
-        }
+        let a = s_intervals[i-1].score + m[p[i]];
+        m[i] = cmp::max(a, m[i-1]);
     }
 
     let mut final_schedule: Vec<MotifAlignmentInterval> = Vec::new();
