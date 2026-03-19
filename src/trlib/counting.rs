@@ -136,9 +136,10 @@ fn alignment_items_to_cigar(items: &[AlignmentItem]) -> String {
             } else {
                 cigar = format!("{}{}{}", cigar, current_count, current_op.to_cigar_char());
                 current_op = op;
-                current_count = 0;
+                current_count = 1;
             }
         }
+        cigar = format!("{}{}{}", cigar, current_count, current_op.to_cigar_char());
     }
     cigar
 }
@@ -226,6 +227,10 @@ impl MotifSequenceDecomposer {
                 }
             }
 
+            // fixup cigar - we are always starting with a match or mismatch, because we get gaps at the front for free.
+            //  TODO: validate this + maybe we want to be able to have bases at the front in the seq that become part of
+            //   the motif?
+            motif_alignment.push(if motif[row] == seq[col] { AlignmentItem::Match } else { AlignmentItem::Mismatch });
             motif_alignment.reverse();
             let cigar = alignment_items_to_cigar(&motif_alignment);
 
