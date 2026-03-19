@@ -48,7 +48,7 @@ pub struct MotifAlignmentInterval {
 
 fn backtrack_schedule(
     final_schedule: &mut Vec<MotifAlignmentInterval>,
-    intervals: &Vec<&MotifAlignmentInterval>,
+    mut intervals: Vec<MotifAlignmentInterval>,
     m: &Vec<i32>,
     p: &Vec<usize>,
     j: usize,
@@ -57,8 +57,13 @@ fn backtrack_schedule(
         return;
     }
     if intervals[j - 1].score + m[p[j]] >= m[j - 1] {
-        let temp: MotifAlignmentInterval = intervals[j - 1].clone();
-        final_schedule.push(temp);
+        // avoid clone by moving intervals[j - 1]; we're done with everything from [j - 1] forward anyway
+        // since we only ever decrement j (via p or via subtracting 1).
+        let next_item = {
+            let mut d = intervals.drain((j - 1)..);
+            d.next().expect("backtract_schedule: next item must exist")
+        };
+        final_schedule.push(next_item);
         backtrack_schedule(final_schedule, intervals, m, p, p[j])
     } else {
         backtrack_schedule(final_schedule, intervals, m, p, j - 1)
@@ -68,17 +73,16 @@ fn backtrack_schedule(
 /// Implementation of known weighted interval scheduling algorithm to do the motif decomposition
 /// See https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
 /// Returns the best (or one of the best) schedules + its score.
-fn schedule(intervals: &[MotifAlignmentInterval]) -> (Vec<MotifAlignmentInterval>, i32) {
+fn schedule(mut intervals: Vec<MotifAlignmentInterval>) -> (Vec<MotifAlignmentInterval>, i32) {
     // sort intervals globally by earliest to latest end index
-    let mut s_intervals: Vec<&MotifAlignmentInterval> = intervals.iter().collect();
-    s_intervals.sort_by(|x, y| x.end.cmp(&y.end));
+    intervals.sort_by(|x, y| x.end.cmp(&y.end));
 
     // p[j] is the index of the latest interval that ends before interval j begins
-    let mut p = vec![0; s_intervals.len() + 1];
-    for i in 1..s_intervals.len() + 1 {
+    let mut p = vec![0; intervals.len() + 1];
+    for i in 1..intervals.len() + 1 {
         let mut n = i - 1;
         while n > 0 {
-            if s_intervals[n].end < s_intervals[i - 1].start {
+            if intervals[n].end < intervals[i - 1].start {
                 // interval coordinates are inclusive, so use '<'
                 p[i] = n + 1;
                 break;
@@ -88,19 +92,20 @@ fn schedule(intervals: &[MotifAlignmentInterval]) -> (Vec<MotifAlignmentInterval
     }
 
     // construct score table
-    let mut m = vec![0; s_intervals.len() + 1];
-    for i in 1..s_intervals.len() + 1 {
-        let a = s_intervals[i - 1].score + m[p[i]];
+    let mut m = vec![0; intervals.len() + 1];
+    for i in 1..intervals.len() + 1 {
+        let a = intervals[i - 1].score + m[p[i]];
         m[i] = cmp::max(a, m[i - 1]);
     }
 
     let mut final_schedule: Vec<MotifAlignmentInterval> = Vec::new();
+    let n_intervals = intervals.len();
 
-    backtrack_schedule(&mut final_schedule, &s_intervals, &m, &p, s_intervals.len());
+    backtrack_schedule(&mut final_schedule, intervals, &m, &p, n_intervals);
 
     final_schedule.reverse();
 
-    (final_schedule, m[s_intervals.len()])
+    (final_schedule, m[n_intervals])
 }
 
 /// Encodes a CIGAR-ish alignment operation (insertion/deletion/match/mismatch).
@@ -282,14 +287,12 @@ impl MotifSequenceDecomposer {
             alignments.push((m, self.aligner.align(Some(m), seq)?));
         }
 
-        //  2. determine intervals using some kind of heuristic so we don't have an absurd number?
-        //     or just use last row(?) of the matrix as the score + figure out the interval... + do a little trimming
+        //  2. determine intervals, cutting off low-scoring possibilities
         let intervals = self.compute_intervals(seq, &alignments, self.motif_alignment_score_cutoff, seq.len())?;
-        eprintln!("{:?}", intervals);
 
         //  3: use weighted interval scheduling algorithm https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
         //     to find best sequence of motifs, with any 'idle' time being non-motif DNA in between motifs.
-        let (decomposition, score) = schedule(&intervals);
+        let (decomposition, score) = schedule(intervals);
 
         Ok(MotifSequenceDecomposition { decomposition, score })
     }
