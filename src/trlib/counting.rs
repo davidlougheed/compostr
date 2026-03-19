@@ -311,7 +311,11 @@ mod tests {
 
     #[rstest]
     #[case(b"CAGCAGCAGCAGCAGCAGCAGCAGCAG".to_vec(), vec!["CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG"])]
-    #[case(b"CCGCCGCCGCCGCCGCCGCCGCCGCCG".to_vec(), vec!["CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG"])]
+    #[case(
+        b"CCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCAG".to_vec(),
+        vec!["CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG",
+             "CAG"]
+    )]
     #[case(b"CAGCAGCGGCAGCAAG".to_vec(), vec!["CAG", "CAG", "CGG", "CAG", "CAAG"])]
     #[case(b"CAGCAGCAAGTTCAGCCGCCGCCCG".to_vec(), vec!["CAG", "CAG", "CAAG", "T", "T", "CAG", "CCG", "CCG", "CCCG"])]
     fn test_decomposition(#[case] seq: Vec<u8>, #[case] expected_decomp: Vec<&str>) {
