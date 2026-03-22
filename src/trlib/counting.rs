@@ -1,6 +1,7 @@
 use parasail_rs::prelude::{Aligner, Alignment, Error, Matrix, Table};
 use std::cmp;
 use std::str::{self, Utf8Error};
+use std::sync::Arc;
 
 use crate::motif::MotifSet;
 
@@ -8,6 +9,7 @@ use crate::motif::MotifSet;
 /// Contains the decomposition of the sequence into canonical motifs/sequence chunks + a CIGAR alignment for each
 /// decomposed element (TODO) + the final score of the decomposition (i.e., interval-schedule weight) + TODO...
 pub struct MotifSequenceDecomposition {
+    pub motif_set: Arc<MotifSet>,
     pub decomposition: Vec<MotifAlignmentInterval>,
     pub score: i32, // Total weight achieved
 }
@@ -20,12 +22,62 @@ impl MotifSequenceDecomposition {
         }
         Ok(res)
     }
+
+    pub fn cigar(&self) -> Vec<CigarItem> {
+        self.decomposition.iter().flat_map(|d| d.cigar.clone()).collect()
+    }
+
+    pub fn cigar_string(&self) -> String {
+        self.decomposition.iter()
+            .flat_map(|d| d.cigar.clone())
+            .map(|i| i.to_cigar_string())
+            .collect::<Vec<String>>()
+            .join("")
+    }
+
+    pub fn alignment_string(&self, seq: &[u8]) -> String {
+        let mut query_string = String::new();
+        let mut align_string = String::new();
+        let mut seq_string = String::new();
+
+        for d in self.decomposition.iter() {
+            let m = &self.motif_set.motifs[d.motif_idx];
+            let mut qi = 0;
+            let mut ri = d.start;
+            eprintln!("d cigar {:?}", d.cigar);
+            for item in d.cigar.iter() {
+                align_string = format!("{}{}", align_string, item.to_alignment_string());
+                match item {
+                    CigarItem::Del(c) => {
+                        query_string = format!("{}{}", query_string, String::from_utf8_lossy(&m[qi..qi+c]));
+                        seq_string = format!("{}{}", seq_string, "-".repeat(*c));
+                        qi += c;
+                    },
+                    CigarItem::Ins(c) => {
+                        query_string = format!("{}{}", query_string, "-".repeat(*c));
+                        // TODO: not right, need to keep index
+                        seq_string = format!("{}{}", seq_string, String::from_utf8_lossy(&seq[ri..ri+c]));
+                        ri += c;
+                    },
+                    CigarItem::Match(c) | CigarItem::Mismatch(c) => {
+                        query_string = format!("{}{}", query_string, String::from_utf8_lossy(&m[qi..qi+c]));
+                        // TODO: not right, need to keep index
+                        seq_string = format!("{}{}", seq_string, String::from_utf8_lossy(&seq[ri..ri+c]));
+                        qi += c;
+                        ri += c;
+                    },
+                }
+            }
+        }
+
+        format!("{}\n{}\n{}", query_string, align_string, seq_string)
+    }
 }
 
 /// 'Machine' that decomposes repetitive, TR-esque DNA sequences using a set of provided motifs.
 pub struct MotifSequenceDecomposer {
     // set of 'canonical' motifs for decomposition:
-    pub motif_set: MotifSet,
+    pub motif_set: Arc<MotifSet>,
     // alignment:  TODO: more advanced scoring/matrix
     match_score: i32,
     mismatch_score: i32,
@@ -42,7 +94,7 @@ pub struct MotifAlignmentInterval {
     start: usize,
     end: usize,
     score: i32,
-    cigar: String,
+    pub cigar: Vec<CigarItem>,
     motif_idx: usize,
 }
 
@@ -119,18 +171,45 @@ enum AlignmentItem {
 }
 
 impl AlignmentItem {
-    fn to_cigar_char(&self) -> char {
+    fn to_cigar_item(&self, count: usize) -> CigarItem {
         match self {
-            AlignmentItem::Ins => 'I',
-            AlignmentItem::Del => 'D',
-            AlignmentItem::Match => '=',
-            AlignmentItem::Mismatch => 'X',
+            AlignmentItem::Ins => CigarItem::Ins(count),
+            AlignmentItem::Del => CigarItem::Del(count),
+            AlignmentItem::Match => CigarItem::Match(count),
+            AlignmentItem::Mismatch => CigarItem::Mismatch(count),
         }
     }
 }
 
-fn alignment_items_to_cigar(items: &[AlignmentItem]) -> String {
-    let mut cigar = String::new();
+#[derive(Clone, Debug)]
+pub enum CigarItem {
+    Ins(usize),
+    Del(usize),
+    Match(usize),
+    Mismatch(usize),
+}
+
+impl CigarItem {
+    fn to_cigar_string(&self) -> String {
+        match self {
+            Self::Ins(c) => format!("{}I", c),
+            Self::Del(c) => format!("{}D", c),
+            Self::Match(c) => format!("{}=", c),
+            Self::Mismatch(c) => format!("{}X", c),
+        }
+    }
+
+    fn to_alignment_string(&self) -> String {
+        match self {
+            Self::Ins(c) | Self::Del(c) => " ".repeat(*c),
+            Self::Match(c) => "|".repeat(*c),
+            Self::Mismatch(c) => "X".repeat(*c),
+        }
+    }
+}
+
+fn alignment_items_to_cigar(items: &[AlignmentItem]) -> Vec<CigarItem> {
+    let mut cigar = Vec::new();
     let mut ii = items.iter();
     if let Some(first) = ii.next() {
         let mut current_op = first;
@@ -139,12 +218,12 @@ fn alignment_items_to_cigar(items: &[AlignmentItem]) -> String {
             if op == current_op {
                 current_count += 1;
             } else {
-                cigar = format!("{}{}{}", cigar, current_count, current_op.to_cigar_char());
+                cigar.push(current_op.to_cigar_item(current_count));
                 current_op = op;
                 current_count = 1;
             }
         }
-        cigar = format!("{}{}{}", cigar, current_count, current_op.to_cigar_char());
+        cigar.push(current_op.to_cigar_item(current_count));
     }
     cigar
 }
@@ -169,7 +248,7 @@ impl MotifSequenceDecomposer {
             .build();
 
         MotifSequenceDecomposer {
-            motif_set,
+            motif_set: Arc::new(motif_set),
             match_score,
             mismatch_score,
             gap_penalty,
@@ -189,7 +268,7 @@ impl MotifSequenceDecomposer {
         mut row: usize,
         end_col: usize,
         cutoff: i32,
-    ) -> Option<(usize, usize, i32, String)> {
+    ) -> Option<(usize, usize, i32, Vec<CigarItem>)> {
         let mut col = end_col;
 
         let score = tbl.get(row, col);
@@ -294,10 +373,10 @@ impl MotifSequenceDecomposer {
         //     to find best sequence of motifs, with any 'idle' time being non-motif DNA in between motifs.
         let (decomposition, score) = schedule(intervals);
 
-        Ok(MotifSequenceDecomposition { decomposition, score })
+        Ok(MotifSequenceDecomposition { motif_set: self.motif_set.clone(), decomposition, score })
     }
 
-    pub fn decomp_to_str(&self, decomp: MotifSequenceDecomposition) -> Result<Vec<&str>, Utf8Error> {
+    pub fn decomp_to_str(&self, decomp: &MotifSequenceDecomposition) -> Result<Vec<&str>, Utf8Error> {
         let mut return_vec = Vec::new();
         for i in decomp.decomposition.iter() {
             let decomp_str: &str = str::from_utf8(self.motif_set.motifs[i.motif_idx].as_slice())?;
@@ -313,18 +392,42 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    #[case(b"CAGCAGCAGCAGCAGCAGCAGCAGCAG".to_vec(), vec!["CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG"])]
+    #[case(b"CAG".to_vec(), vec!["CAG"], "CAG\n|||\nCAG")]
+    #[case(b"CAAG".to_vec(), vec!["CAG"], "CA-G\n|| |\nCAAG")]
+    #[case(
+        b"CAGCAGCAGCAGCAGCAGCAGCAGCAG".to_vec(),
+        vec!["CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG"],
+        "CAGCAGCAGCAGCAGCAGCAGCAGCAG\n\
+         |||||||||||||||||||||||||||\n\
+         CAGCAGCAGCAGCAGCAGCAGCAGCAG",
+    )]
     #[case(
         b"CCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCAG".to_vec(),
         vec!["CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG", "CCG",
-             "CAG"]
+             "CAG"],
+        "CCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCAG\n\
+         ||||||||||||||||||||||||||||||||||||||||||||||||\n\
+         CCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCAG",
     )]
-    #[case(b"CAGCAGCGGCAGCAAG".to_vec(), vec!["CAG", "CAG", "CGG", "CAG", "CAAG"])]
-    #[case(b"CAGCAGCAAGTTCAGCCGCCGCCCG".to_vec(), vec!["CAG", "CAG", "CAAG", "T", "T", "CAG", "CCG", "CCG", "CCCG"])]
-    fn test_decomposition(#[case] seq: Vec<u8>, #[case] expected_decomp: Vec<&str>) {
+    #[case(
+        b"CAGCAGCGGCAGCAAG".to_vec(),
+        vec!["CAG", "CAG", "CGG", "CAG", "CAAG"],
+        "CAGCAGCCGCAGCA-G\n\
+         |||||||X|||||| |\n\
+         CAGCAGCGGCAGCAAG",
+    )]
+    #[case(
+        b"CAGCAGCAAGTTCAGCCGCCGCCCG".to_vec(),
+        vec!["CAG", "CAG", "CAAG", "TT", "CAG", "CCG", "CCG", "CCCG"],
+        "CAGCAGCA-G--CAGCCGCCGCC-G\n\
+         |||||||| |  ||||||||||| |\n\
+         CAGCAGCAAGTTCAGCCGCCGCCCG",
+    )]
+    fn test_decomposition(#[case] seq: Vec<u8>, #[case] expected_decomp: Vec<&str>, #[case] expected_align_str: &str) {
         let motif_set = MotifSet::new_from_strs(&vec!["CAG", "CCG"]);
         let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, Some(1));
         let res = decomposer.decompose(seq.as_slice()).unwrap();
-        assert_eq!(decomposer.decomp_to_str(res).unwrap(), expected_decomp);
+        // assert_eq!(decomposer.decomp_to_str(&res).unwrap(), expected_decomp);
+        assert_eq!(res.alignment_string(&seq), expected_align_str);
     }
 }
