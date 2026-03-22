@@ -28,7 +28,8 @@ impl MotifSequenceDecomposition {
     }
 
     pub fn cigar_string(&self) -> String {
-        self.decomposition.iter()
+        self.decomposition
+            .iter()
             .flat_map(|d| d.cigar.clone())
             .map(|i| i.to_cigar_string())
             .collect::<Vec<String>>()
@@ -36,9 +37,16 @@ impl MotifSequenceDecomposition {
     }
 
     pub fn items(&self, seq: &[u8]) -> Vec<(Vec<u8>, Vec<CigarItem>, Vec<u8>)> {
-        self.decomposition.iter().map(|d| {
-            (self.motif_set.motifs[d.motif_idx].clone(), d.cigar.clone(), seq[d.start..d.end].to_vec())
-        }).collect()
+        self.decomposition
+            .iter()
+            .map(|d| {
+                (
+                    self.motif_set.motifs[d.motif_idx].clone(),
+                    d.cigar.clone(),
+                    seq[d.start..d.end].to_vec(),
+                )
+            })
+            .collect()
     }
 
     /// Returns a human-readable alignment string representation given the originally decomposed string, which will
@@ -63,26 +71,31 @@ impl MotifSequenceDecomposition {
                 align_strings.push(item.to_alignment_string());
                 match item {
                     CigarItem::Del(c) => {
-                        query_strings.push(String::from_utf8_lossy(&m[qi..qi+c]).to_string());
+                        query_strings.push(String::from_utf8_lossy(&m[qi..qi + c]).to_string());
                         seq_strings.push("-".repeat(*c));
                         qi += c;
-                    },
+                    }
                     CigarItem::Ins(c) => {
                         query_strings.push("-".repeat(*c));
-                        seq_strings.push(String::from_utf8_lossy(&seq[ri..ri+c]).to_string());
+                        seq_strings.push(String::from_utf8_lossy(&seq[ri..ri + c]).to_string());
                         ri += c;
-                    },
+                    }
                     CigarItem::Match(c) | CigarItem::Mismatch(c) => {
-                        query_strings.push(String::from_utf8_lossy(&m[qi..qi+c]).to_string());
-                        seq_strings.push(String::from_utf8_lossy(&seq[ri..ri+c]).to_string());
+                        query_strings.push(String::from_utf8_lossy(&m[qi..qi + c]).to_string());
+                        seq_strings.push(String::from_utf8_lossy(&seq[ri..ri + c]).to_string());
                         qi += c;
                         ri += c;
-                    },
+                    }
                 }
             }
         }
 
-        format!("{}\n{}\n{}", query_strings.join(""), align_strings.join(""), seq_strings.join(""))
+        format!(
+            "{}\n{}\n{}",
+            query_strings.join(""),
+            align_strings.join(""),
+            seq_strings.join("")
+        )
     }
 }
 
@@ -326,7 +339,11 @@ impl MotifSequenceDecomposer {
             // fixup cigar - we are always starting with a match or mismatch, because we get gaps at the front for free.
             //  TODO: validate this + maybe we want to be able to have bases at the front in the seq that become part of
             //   the motif?
-            motif_alignment.push(if motif[row] == seq[col] { AlignmentItem::Match } else { AlignmentItem::Mismatch });
+            motif_alignment.push(if motif[row] == seq[col] {
+                AlignmentItem::Match
+            } else {
+                AlignmentItem::Mismatch
+            });
             motif_alignment.reverse();
             let cigar = alignment_items_to_cigar(&motif_alignment);
 
@@ -385,7 +402,11 @@ impl MotifSequenceDecomposer {
         //     to find best sequence of motifs, with any 'idle' time being non-motif DNA in between motifs.
         let (decomposition, score) = schedule(intervals);
 
-        Ok(MotifSequenceDecomposition { motif_set: self.motif_set.clone(), decomposition, score })
+        Ok(MotifSequenceDecomposition {
+            motif_set: self.motif_set.clone(),
+            decomposition,
+            score,
+        })
     }
 
     pub fn decomp_to_str(&self, decomp: &MotifSequenceDecomposition) -> Result<Vec<&str>, Utf8Error> {
