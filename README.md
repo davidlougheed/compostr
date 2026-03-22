@@ -38,7 +38,7 @@ which allows for non-canonical motifs or even non-repeat DNA inserted into the s
 
 ## Copyright Notice
 
-&copy; David Lougheed 2026.
+&copy; David Lougheed and Aidon Lebar 2026.
 
 ### Notice
 
