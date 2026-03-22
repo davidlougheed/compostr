@@ -35,34 +35,46 @@ impl MotifSequenceDecomposition {
             .join("")
     }
 
+    pub fn items(&self, seq: &[u8]) -> Vec<(Vec<u8>, Vec<CigarItem>, Vec<u8>)> {
+        self.decomposition.iter().map(|d| {
+            (self.motif_set.motifs[d.motif_idx].clone(), d.cigar.clone(), seq[d.start..d.end].to_vec())
+        }).collect()
+    }
+
+    /// Returns a human-readable alignment string representation given the originally decomposed string, which will
+    /// look something like:
+    ///
+    /// CAGCAGCAGCAGCA-G
+    /// |||||||X|||||| |
+    /// CAGCAGCGGCAGCAAG
+    ///
+    /// Where the top string is generated from the motif set + the found decomposition, and the bottom string is the
+    /// original sequence.
     pub fn alignment_string(&self, seq: &[u8]) -> String {
-        let mut query_string = String::new();
-        let mut align_string = String::new();
-        let mut seq_string = String::new();
+        let mut query_strings = Vec::<String>::new();
+        let mut align_strings = Vec::<String>::new();
+        let mut seq_strings = Vec::<String>::new();
 
         for d in self.decomposition.iter() {
             let m = &self.motif_set.motifs[d.motif_idx];
             let mut qi = 0;
             let mut ri = d.start;
-            eprintln!("d cigar {:?}", d.cigar);
             for item in d.cigar.iter() {
-                align_string = format!("{}{}", align_string, item.to_alignment_string());
+                align_strings.push(item.to_alignment_string());
                 match item {
                     CigarItem::Del(c) => {
-                        query_string = format!("{}{}", query_string, String::from_utf8_lossy(&m[qi..qi+c]));
-                        seq_string = format!("{}{}", seq_string, "-".repeat(*c));
+                        query_strings.push(String::from_utf8_lossy(&m[qi..qi+c]).to_string());
+                        seq_strings.push("-".repeat(*c));
                         qi += c;
                     },
                     CigarItem::Ins(c) => {
-                        query_string = format!("{}{}", query_string, "-".repeat(*c));
-                        // TODO: not right, need to keep index
-                        seq_string = format!("{}{}", seq_string, String::from_utf8_lossy(&seq[ri..ri+c]));
+                        query_strings.push("-".repeat(*c));
+                        seq_strings.push(String::from_utf8_lossy(&seq[ri..ri+c]).to_string());
                         ri += c;
                     },
                     CigarItem::Match(c) | CigarItem::Mismatch(c) => {
-                        query_string = format!("{}{}", query_string, String::from_utf8_lossy(&m[qi..qi+c]));
-                        // TODO: not right, need to keep index
-                        seq_string = format!("{}{}", seq_string, String::from_utf8_lossy(&seq[ri..ri+c]));
+                        query_strings.push(String::from_utf8_lossy(&m[qi..qi+c]).to_string());
+                        seq_strings.push(String::from_utf8_lossy(&seq[ri..ri+c]).to_string());
                         qi += c;
                         ri += c;
                     },
@@ -70,7 +82,7 @@ impl MotifSequenceDecomposition {
             }
         }
 
-        format!("{}\n{}\n{}", query_string, align_string, seq_string)
+        format!("{}\n{}\n{}", query_strings.join(""), align_strings.join(""), seq_strings.join(""))
     }
 }
 
