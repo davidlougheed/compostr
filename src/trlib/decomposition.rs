@@ -14,6 +14,11 @@ pub struct MotifSequenceDecomposition {
     pub score: i32, // Total weight achieved
 }
 
+pub enum DecompositionItem {
+    Alignment(MotifAlignmentInterval),
+    Gap(usize),
+}
+
 impl MotifSequenceDecomposition {
     pub fn decomposition_strs(&self) -> Result<Vec<&str>, Utf8Error> {
         let mut res = Vec::with_capacity(self.decomposition.len());
@@ -24,29 +29,44 @@ impl MotifSequenceDecomposition {
     }
 
     pub fn cigar(&self) -> Vec<CigarItem> {
-        self.decomposition.iter().flat_map(|d| d.cigar.clone()).collect()
+        // TODO: use a view version of .items() for this function
+
+        let mut cigars = Vec::<CigarItem>::new();
+        let mut last_end = 0;
+
+        for d in self.decomposition.iter() {
+            if d.start > last_end + 1 {
+                // Infill any gaps where we didn't decompose to any motif at all
+                cigars.push(CigarItem::Ins(d.start - last_end - 1)); // TODO: is this the right one?
+            }
+            cigars.extend_from_slice(&d.cigar);
+            last_end = d.end;
+        }
+
+        cigars
     }
 
     pub fn cigar_string(&self) -> String {
-        self.decomposition
-            .iter()
-            .flat_map(|d| d.cigar.clone())
-            .map(|i| i.to_cigar_string())
-            .collect::<Vec<String>>()
-            .join("")
+        let cigar_strings: Vec<String> = self.cigar().into_iter().map(|c| c.to_alignment_string()).collect();
+        cigar_strings.join("")
     }
 
-    pub fn items(&self, seq: &[u8]) -> Vec<(Vec<u8>, Vec<CigarItem>, Vec<u8>)> {
-        self.decomposition
-            .iter()
-            .map(|d| {
-                (
-                    self.motif_set.motifs[d.motif_idx].clone(),
-                    d.cigar.clone(),
-                    seq[d.start..d.end].to_vec(),
-                )
-            })
-            .collect()
+    pub fn items(&self) -> Vec<DecompositionItem> {
+        // TODO: implement 'view' version with iterator (keep a flag to know if we've already yielded the Gap)
+
+        let mut res = Vec::new();
+        let mut last_end = 0;
+
+        for d in self.decomposition.iter() {
+            if d.start > last_end + 1 {
+                // Infill any gaps where we didn't decompose to any motif at all
+                res.push(DecompositionItem::Gap(d.start - last_end + 1));
+            }
+            res.push(DecompositionItem::Alignment(d.clone()));
+            last_end = d.end;
+        }
+
+        res
     }
 
     /// Returns a human-readable alignment string representation given the originally decomposed string, which will
@@ -59,14 +79,24 @@ impl MotifSequenceDecomposition {
     /// Where the top string is generated from the motif set + the found decomposition, and the bottom string is the
     /// original sequence.
     pub fn alignment_string(&self, seq: &[u8]) -> String {
+        // TODO: use a view version of .items() for this function
+
         let mut query_strings = Vec::<String>::new();
         let mut align_strings = Vec::<String>::new();
         let mut seq_strings = Vec::<String>::new();
 
+        let mut last_end = 0;
         for d in self.decomposition.iter() {
             let m = &self.motif_set.motifs[d.motif_idx];
             let mut qi = 0;
             let mut ri = d.start;
+            if ri > last_end + 1 {
+                // Infill any gaps where we didn't decompose to any motif at all
+                let undecomp_seq = String::from_utf8_lossy(&seq[last_end + 1..ri]).to_string();
+                query_strings.push(" ".repeat(undecomp_seq.len())); // different type of gap, use space
+                align_strings.push(" ".repeat(undecomp_seq.len()));
+                seq_strings.push(undecomp_seq);
+            }
             for item in d.cigar.iter() {
                 align_strings.push(item.to_alignment_string());
                 match item {
@@ -88,6 +118,7 @@ impl MotifSequenceDecomposition {
                     }
                 }
             }
+            last_end = d.end;
         }
 
         format!(
@@ -113,14 +144,13 @@ pub struct MotifSequenceDecomposer {
 }
 
 /// Representation of a motif alignment to a sequence.
-/// Format: start (inclusive 0-based), end (inclusive 0-based), score, alignment table index
 #[derive(Clone, Debug)]
 pub struct MotifAlignmentInterval {
-    start: usize,
-    end: usize,
-    score: i32,
+    start: usize, // inclusive, 0-based
+    end: usize, // inclusive, 0-based
+    pub score: i32,
     pub cigar: Vec<CigarItem>,
-    motif_idx: usize,
+    motif_idx: usize, // Index of the motif in the motif set
 }
 
 fn backtrack_schedule(
@@ -452,7 +482,7 @@ mod tests {
     #[case(
         b"CAGCAGCAAGTTCAGCCGCCGCCCG".to_vec(),
         vec!["CAG", "CAG", "CAAG", "TT", "CAG", "CCG", "CCG", "CCCG"],
-        "CAGCAGCA-G--CAGCCGCCGCC-G\n\
+        "CAGCAGCA-G  CAGCCGCCGCC-G\n\
          |||||||| |  ||||||||||| |\n\
          CAGCAGCAAGTTCAGCCGCCGCCCG",
     )]
