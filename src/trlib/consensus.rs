@@ -1,4 +1,4 @@
-use crate::counting::MotifSequenceDecomposition;
+use crate::decomposition::MotifSequenceDecomposition;
 
 pub struct MotifSequenceConsensus {}
 
