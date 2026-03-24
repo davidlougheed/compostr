@@ -335,11 +335,15 @@ impl MotifSequenceDecomposer {
             let mut motif_alignment: Vec<AlignmentItem> = Vec::new();
 
             while row > 0 {
-                let mut options: Vec<(usize, usize, i32, AlignmentItem)> = Vec::new();
+                // Instead of keeping options in vec, save a lot of time by just enumerating every possible comparison
+                let mut ins_opt: Option<(usize, usize, i32, AlignmentItem)> = None;
+                let mut match_opt: Option<(usize, usize, i32, AlignmentItem)> = None;
+                let mut del_opt: Option<(usize, usize, i32, AlignmentItem)> = None;
+
                 if col > 0 {
                     // TODO: this doesn't support affine gap properly
                     if let Some(left) = tbl.get(row, col - 1) {
-                        options.push((row, col - 1, left - self.gap_penalty, AlignmentItem::Ins));
+                        ins_opt = Some((row, col - 1, left - self.gap_penalty, AlignmentItem::Ins));
                     }
                     if let Some(diag) = tbl.get(row - 1, col - 1) {
                         let (sc, ait) = if motif[row - 1] == seq[col - 1] {
@@ -347,20 +351,44 @@ impl MotifSequenceDecomposer {
                         } else {
                             (self.mismatch_score, AlignmentItem::Mismatch)
                         };
-                        options.push((row - 1, col - 1, diag + sc, ait));
+                        match_opt = Some((row - 1, col - 1, diag + sc, ait));
                     }
                 }
                 // TODO: this doesn't support affine gap properly
                 if let Some(up) = tbl.get(row - 1, col) {
-                    options.push((row - 1, col, up - self.gap_penalty, AlignmentItem::Del));
+                    del_opt = Some((row - 1, col, up - self.gap_penalty, AlignmentItem::Del));
                 }
-                let maxopt = options.iter().reduce(|acc, opt| if opt.2 > acc.2 { opt } else { acc });
+
+                let maxopt = match (ins_opt, match_opt, del_opt) {
+                    (Some(i), Some(m), Some(d)) => {
+                        if i.2 > m.2 && i.2 >= d.2 { Some(i) }
+                        else if m.2 >= i.2 && m.2 >= d.2 { Some(m) }
+                        else { Some(d) } // if d.2 > m.2 && d.2 > i.2
+                    },
+                    // two-option cases
+                    (Some(i), Some(m), None) => {
+                        if i.2 > m.2 { Some(i) } else { Some(m) }
+                    },
+                    (Some(i), None, Some(d)) => {
+                        if i.2 >= d.2 { Some(i) } else { Some(d) }
+                    },
+                    (None, Some(m), Some(d)) => {
+                        if m.2 >= d.2 { Some(m) } else { Some(d) }
+                    },
+                    // single cases
+                    (Some(i), None, None) => Some(i),
+                    (None, Some(m), None) => Some(m),
+                    (None, None, Some(d)) => Some(d),
+                    // base case
+                    (None, None, None) => None
+                };
+
 
                 // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow.
                 if let Some(mo) = maxopt {
                     row = mo.0;
                     col = mo.1;
-                    motif_alignment.push(mo.3.clone());
+                    motif_alignment.push(mo.3);
                 } else {
                     return None; // Something went wrong with score retrieval, this shouldn't happen
                 }
