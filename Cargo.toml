@@ -10,3 +10,8 @@ parasail-rs = "0.9.0"
 
 [dev-dependencies]
 rstest = "0.26.1"
+
+[lib]
+[[example]]
+name = "perf-benchmark"
+path = "examples/perf.rs"
