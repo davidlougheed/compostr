@@ -182,7 +182,7 @@ fn backtrack_schedule(
 /// Returns the best (or one of the best) schedules + its score.
 fn schedule(mut intervals: Vec<MotifAlignmentInterval>) -> (Vec<MotifAlignmentInterval>, i32) {
     // sort intervals globally by earliest to latest end index
-    intervals.sort_by(|x, y| x.end.cmp(&y.end));
+    intervals.sort_unstable_by(|x, y| x.end.cmp(&y.end));
 
     // p[j] is the index of the latest interval that ends before interval j begins
     let mut p = vec![0; intervals.len() + 1];
