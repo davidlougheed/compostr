@@ -193,6 +193,25 @@ fn schedule(mut intervals: Vec<MotifAlignmentInterval>) -> (Vec<MotifAlignmentIn
     (final_schedule, m[n_intervals])
 }
 
+/// Given a schedule of MotifAlignmentInterval, wrap with DecompositionItem::Alignment and fill in gaps with
+/// DecompositionItem::Gap so that we have a contiguous record of alignment/gap for the whole sequence.
+fn interval_schedule_to_decomposition(schedule: Vec<MotifAlignmentInterval>, seq_len: usize) -> Vec<DecompositionItem> {
+    let mut last_end = 0;
+    let mut decomposition = Vec::with_capacity(schedule.len());  // Size >= schedule.len()
+    for d in schedule.into_iter() {
+        if d.start > last_end + 1 {
+            // Infill any gaps where we didn't decompose to any motif at all
+            decomposition.push(DecompositionItem::Gap(d.start - last_end - 1));
+        }
+        last_end = d.end;
+        decomposition.push(DecompositionItem::Alignment(d));
+    }
+    if last_end < seq_len - 1 {
+        decomposition.push(DecompositionItem::Gap(seq_len - last_end - 1));
+    }
+    decomposition
+}
+
 /// Encodes a CIGAR-ish alignment operation (insertion/deletion/match/mismatch).
 /// With a grouping function, this can become a real CIGAR.
 #[derive(Clone, Debug, PartialEq)]
@@ -223,7 +242,7 @@ pub enum CigarItem {
 }
 
 impl CigarItem {
-    fn to_cigar_string(&self) -> String {
+    pub fn to_cigar_string(&self) -> String {
         match self {
             Self::Ins(c) => format!("{}I", c),
             Self::Del(c) => format!("{}D", c),
@@ -239,26 +258,6 @@ impl CigarItem {
             Self::Mismatch(c) => "X".repeat(*c),
         }
     }
-}
-
-fn alignment_items_to_cigar(items: &[AlignmentItem]) -> Vec<CigarItem> {
-    let mut cigar = Vec::new();
-    let mut ii = items.iter();
-    if let Some(first) = ii.next() {
-        let mut current_op = first;
-        let mut current_count: usize = 1;
-        for op in ii {
-            if op == current_op {
-                current_count += 1;
-            } else {
-                cigar.push(current_op.to_cigar_item(current_count));
-                current_op = op;
-                current_count = 1;
-            }
-        }
-        cigar.push(current_op.to_cigar_item(current_count));
-    }
-    cigar
 }
 
 impl MotifSequenceDecomposer {
@@ -459,20 +458,7 @@ impl MotifSequenceDecomposer {
         let copies = schedule.len();
 
         //  4: build final decomposition items by interspersing gaps as needed
-        let mut decomposition = Vec::with_capacity(schedule.len());  // Size >= schedule.len()
-        let mut last_end = 0;
-
-        for d in schedule.into_iter() {
-            if d.start > last_end + 1 {
-                // Infill any gaps where we didn't decompose to any motif at all
-                decomposition.push(DecompositionItem::Gap(d.start - last_end - 1));
-            }
-            last_end = d.end;
-            decomposition.push(DecompositionItem::Alignment(d));
-        }
-        if last_end < seq.len() - 1 {
-            decomposition.push(DecompositionItem::Gap(seq.len() - last_end - 1));
-        }
+        let decomposition = interval_schedule_to_decomposition(schedule, seq.len());
 
         Ok(MotifSequenceDecomposition {
             motif_set: self.motif_set.clone(),
@@ -534,6 +520,26 @@ mod tests {
         let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, Some(1));
         let res = decomposer.decompose(seq.as_slice()).unwrap();
         // assert_eq!(decomposer.decomp_to_str(&res).unwrap(), expected_decomp);
+        assert_eq!(res.alignment_string(&seq), expected_align_str);
+        assert_eq!(res.copies, expected_copies);
+    }
+
+    #[rstest]
+    #[case(
+        b"GTGAGGATGATGGGAGTGTGCGCAGTGTAAGGATGATGGGAGTGTGTGCAATGTGAGGATGATGGGAGTGTGCACAGTGTGAGGACGATGGGAGTGTGCG".to_vec(),
+        "    GATGATGGGAGTGTGCGCAGTGTAAGGATGATGGGAGTGTGCGCAGTGT-AAGGATGATGGGAGTGTGCGCAGTGT-AAG                 \n\
+    ||||||||||||||||||||||||||||||||||||||||||X|||X|| X ||||||||||||||||||X||||| X |
+TGAGGATGATGGGAGTGTGCGCAGTGTAAGGATGATGGGAGTGTGTGCAATGTGA-GGATGATGGGAGTGTGCACAGTGTGA-GGACGATGGGAGTGTGCG",
+        3,
+    )]
+    fn test_decomposition_2(
+        #[case] seq: Vec<u8>,
+        #[case] expected_align_str: &str,
+        #[case] expected_copies: usize,
+    ) {
+        let motif_set = MotifSet::new_from_strs(&vec!["GATGATGGGAGTGTGCGCAGTGTAAG"]);
+        let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, Some(-2));
+        let res = decomposer.decompose(seq.as_slice()).unwrap();
         assert_eq!(res.alignment_string(&seq), expected_align_str);
         assert_eq!(res.copies, expected_copies);
     }
