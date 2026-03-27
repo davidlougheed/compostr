@@ -332,7 +332,10 @@ impl MotifSequenceDecomposer {
             && s >= cutoff
         {
             // keep alignment of motif to sequence from traceback as well:
-            let mut motif_alignment: Vec<AlignmentItem> = Vec::new();
+            let mut current_op: AlignmentItem = AlignmentItem::Match; // Dummy value to be replaced
+            let mut current_op_count: usize = 0;
+
+            let mut cigar: Vec<CigarItem> = Vec::new();
 
             while row > 0 {
                 // Instead of keeping options in vec, save a lot of time by just enumerating every possible comparison
@@ -388,7 +391,15 @@ impl MotifSequenceDecomposer {
                 if let Some(mo) = maxopt {
                     row = mo.0;
                     col = mo.1;
-                    motif_alignment.push(mo.3);
+                    if mo.3 != current_op {
+                        if current_op_count > 0 {
+                            cigar.push(current_op.to_cigar_item(current_op_count));
+                        }
+                        current_op = mo.3;
+                        current_op_count = 1;
+                    } else {
+                        current_op_count += 1;
+                    }
                 } else {
                     return None; // Something went wrong with score retrieval, this shouldn't happen
                 }
@@ -397,13 +408,24 @@ impl MotifSequenceDecomposer {
             // fixup cigar - we are always starting with a match or mismatch, because we get gaps at the front for free.
             //  TODO: validate this + maybe we want to be able to have bases at the front in the seq that become part of
             //   the motif?
-            motif_alignment.push(if motif[row] == seq[col] {
+            let last = if motif[row] == seq[col] {
                 AlignmentItem::Match
             } else {
                 AlignmentItem::Mismatch
-            });
-            motif_alignment.reverse();
-            let cigar = alignment_items_to_cigar(&motif_alignment);
+            };
+
+            if last != current_op {
+                if current_op_count > 0 {
+                    cigar.push(current_op.to_cigar_item(current_op_count));
+                }
+                current_op = last;
+                current_op_count = 1;
+            } else {
+                current_op_count += 1;
+            }
+
+            cigar.push(current_op.to_cigar_item(current_op_count));
+            cigar.reverse();
 
             return Some((col, end_col, s, cigar));
         }
