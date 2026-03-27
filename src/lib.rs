@@ -1,9 +1,7 @@
-pub mod trlib;
-
-use crate::trlib::consensus;
-use crate::trlib::decomposition;
-use crate::trlib::motif;
-use crate::trlib::nw;
+pub mod consensus;
+pub mod decomposition;
+pub mod motif;
+pub mod nw;
 
 #[cfg(test)]
 mod tests {

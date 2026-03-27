@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
-use trlib::trlib::decomposition::MotifSequenceDecomposer;
-use trlib::trlib::motif::MotifSet;
+use trlib::decomposition::MotifSequenceDecomposer;
+use trlib::motif::MotifSet;
 
 fn main() {
     let motif_set = MotifSet::new_from_strs(&vec!["CAG", "CCG"]);
