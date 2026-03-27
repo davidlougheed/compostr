@@ -470,6 +470,9 @@ impl MotifSequenceDecomposer {
             last_end = d.end;
             decomposition.push(DecompositionItem::Alignment(d));
         }
+        if last_end < seq.len() - 1 {
+            decomposition.push(DecompositionItem::Gap(seq.len() - last_end - 1));
+        }
 
         Ok(MotifSequenceDecomposition {
             motif_set: self.motif_set.clone(),
