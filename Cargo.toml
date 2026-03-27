@@ -7,6 +7,7 @@ rust-version = "1.88.0"
 [dependencies]
 ndarray = "0.17.2"
 parasail-rs = "0.9.0"
+smallvec = "1.15.1"
 
 [dev-dependencies]
 rstest = "0.26.1"

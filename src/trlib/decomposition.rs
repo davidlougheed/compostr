@@ -1,4 +1,5 @@
 use parasail_rs::prelude::{Aligner, Alignment, Error, Matrix, Table};
+use smallvec::SmallVec;
 use std::cmp;
 use std::str::{self, Utf8Error};
 use std::sync::Arc;
@@ -10,7 +11,7 @@ use crate::motif::MotifSet;
 /// decomposed element (TODO) + the final score of the decomposition (i.e., interval-schedule weight) + TODO...
 pub struct MotifSequenceDecomposition {
     pub motif_set: Arc<MotifSet>,
-    pub decomposition: Vec<MotifAlignmentInterval>,
+    pub decomposition: Vec<DecompositionItem>,
     pub score: i32, // Total weight achieved
 }
 
@@ -20,53 +21,25 @@ pub enum DecompositionItem {
 }
 
 impl MotifSequenceDecomposition {
-    pub fn decomposition_strs(&self) -> Result<Vec<&str>, Utf8Error> {
-        let mut res = Vec::with_capacity(self.decomposition.len());
-        for m in self.decomposition.iter() {
-            //res.push(str::from_utf8(m.3)?);
-        }
-        Ok(res)
-    }
-
     pub fn cigar(&self) -> Vec<CigarItem> {
-        // TODO: use a view version of .items() for this function
-
         let mut cigars = Vec::<CigarItem>::new();
-        let mut last_end = 0;
-
         for d in self.decomposition.iter() {
-            if d.start > last_end + 1 {
-                // Infill any gaps where we didn't decompose to any motif at all
-                cigars.push(CigarItem::Ins(d.start - last_end - 1)); // TODO: is this the right one?
+            match d {
+                DecompositionItem::Alignment(a) => {
+                    cigars.extend_from_slice(&a.cigar);
+                }
+                DecompositionItem::Gap(g) => {
+                    // Infill any gaps where we didn't decompose to any motif at all
+                    cigars.push(CigarItem::Ins(*g));
+                }
             }
-            cigars.extend_from_slice(&d.cigar);
-            last_end = d.end;
         }
-
         cigars
     }
 
     pub fn cigar_string(&self) -> String {
         let cigar_strings: Vec<String> = self.cigar().into_iter().map(|c| c.to_alignment_string()).collect();
         cigar_strings.join("")
-    }
-
-    pub fn items(&self) -> Vec<DecompositionItem> {
-        // TODO: implement 'view' version with iterator (keep a flag to know if we've already yielded the Gap)
-
-        let mut res = Vec::new();
-        let mut last_end = 0;
-
-        for d in self.decomposition.iter() {
-            if d.start > last_end + 1 {
-                // Infill any gaps where we didn't decompose to any motif at all
-                res.push(DecompositionItem::Gap(d.start - last_end + 1));
-            }
-            res.push(DecompositionItem::Alignment(d.clone()));
-            last_end = d.end;
-        }
-
-        res
     }
 
     /// Returns a human-readable alignment string representation given the originally decomposed string, which will
@@ -87,38 +60,42 @@ impl MotifSequenceDecomposition {
 
         let mut last_end = 0;
         for d in self.decomposition.iter() {
-            let m = &self.motif_set.motifs[d.motif_idx];
-            let mut qi = 0;
-            let mut ri = d.start;
-            if ri > last_end + 1 {
-                // Infill any gaps where we didn't decompose to any motif at all
-                let undecomp_seq = String::from_utf8_lossy(&seq[last_end + 1..ri]).to_string();
-                query_strings.push(" ".repeat(undecomp_seq.len())); // different type of gap, use space
-                align_strings.push(" ".repeat(undecomp_seq.len()));
-                seq_strings.push(undecomp_seq);
-            }
-            for item in d.cigar.iter() {
-                align_strings.push(item.to_alignment_string());
-                match item {
-                    CigarItem::Del(c) => {
-                        query_strings.push(String::from_utf8_lossy(&m[qi..qi + c]).to_string());
-                        seq_strings.push("-".repeat(*c));
-                        qi += c;
+            match d {
+                DecompositionItem::Alignment(a) => {
+                    let m = &self.motif_set.motifs[a.motif_idx];
+                    let mut qi = 0;
+                    let mut ri = a.start;
+                    for item in a.cigar.iter() {
+                        align_strings.push(item.to_alignment_string());
+                        match item {
+                            CigarItem::Del(c) => {
+                                query_strings.push(String::from_utf8_lossy(&m[qi..qi + c]).to_string());
+                                seq_strings.push("-".repeat(*c));
+                                qi += c;
+                            }
+                            CigarItem::Ins(c) => {
+                                query_strings.push("-".repeat(*c));
+                                seq_strings.push(String::from_utf8_lossy(&seq[ri..ri + c]).to_string());
+                                ri += c;
+                            }
+                            CigarItem::Match(c) | CigarItem::Mismatch(c) => {
+                                query_strings.push(String::from_utf8_lossy(&m[qi..qi + c]).to_string());
+                                seq_strings.push(String::from_utf8_lossy(&seq[ri..ri + c]).to_string());
+                                qi += c;
+                                ri += c;
+                            }
+                        }
                     }
-                    CigarItem::Ins(c) => {
-                        query_strings.push("-".repeat(*c));
-                        seq_strings.push(String::from_utf8_lossy(&seq[ri..ri + c]).to_string());
-                        ri += c;
-                    }
-                    CigarItem::Match(c) | CigarItem::Mismatch(c) => {
-                        query_strings.push(String::from_utf8_lossy(&m[qi..qi + c]).to_string());
-                        seq_strings.push(String::from_utf8_lossy(&seq[ri..ri + c]).to_string());
-                        qi += c;
-                        ri += c;
-                    }
+                    last_end = a.end;
+                }
+                DecompositionItem::Gap(g) => {
+                    // Infill any gaps where we didn't decompose to any motif at all
+                    let undecomp_seq = String::from_utf8_lossy(&seq[last_end + 1..last_end + g + 1]).to_string();
+                    query_strings.push(" ".repeat(undecomp_seq.len())); // different type of gap, use space
+                    align_strings.push(" ".repeat(undecomp_seq.len()));
+                    seq_strings.push(undecomp_seq);
                 }
             }
-            last_end = d.end;
         }
 
         format!(
@@ -149,7 +126,7 @@ pub struct MotifAlignmentInterval {
     start: usize, // inclusive, 0-based
     end: usize,   // inclusive, 0-based
     pub score: i32,
-    pub cigar: Vec<CigarItem>,
+    pub cigar: SmallVec<[CigarItem; 4]>,
     motif_idx: usize, // Index of the motif in the motif set
 }
 
@@ -323,7 +300,7 @@ impl MotifSequenceDecomposer {
         mut row: usize,
         end_col: usize,
         cutoff: i32,
-    ) -> Option<(usize, usize, i32, Vec<CigarItem>)> {
+    ) -> Option<(usize, usize, i32, SmallVec<[CigarItem; 4]>)> {
         let mut col = end_col;
 
         let score = tbl.get(row, col);
@@ -335,7 +312,7 @@ impl MotifSequenceDecomposer {
             let mut current_op: AlignmentItem = AlignmentItem::Match; // Dummy value to be replaced
             let mut current_op_count: usize = 0;
 
-            let mut cigar: Vec<CigarItem> = Vec::new();
+            let mut cigar: SmallVec<[CigarItem; 4]> = SmallVec::new();
 
             while row > 0 {
                 // Instead of keeping options in vec, save a lot of time by just enumerating every possible comparison
@@ -439,15 +416,15 @@ impl MotifSequenceDecomposer {
         seq: &[u8],
         alignments: &[(&[u8], Alignment)],
         motif_alignment_score_cutoff: Option<i32>,
-        seq_len: usize,
     ) -> Result<Vec<MotifAlignmentInterval>, Error> {
-        let mut intervals: Vec<MotifAlignmentInterval> = Vec::with_capacity(alignments.len());
+        let mut intervals: Vec<MotifAlignmentInterval> = Vec::with_capacity(alignments.len() * seq.len());
         let cutoff = motif_alignment_score_cutoff.unwrap_or(i32::MIN);
+
         for (ai, f) in alignments.iter().enumerate() {
             let motif_size = f.0.len() - 1;
             let tbl = f.1.get_score_table()?;
 
-            intervals.extend((0..seq_len).filter_map(|i| {
+            intervals.extend((0..seq.len()).filter_map(|i| {
                 self.get_interval_from_score_matrix_start_pos(seq, f.0, &tbl, motif_size, i, cutoff)
                     .map(|iv| MotifAlignmentInterval {
                         start: iv.0,
@@ -473,11 +450,24 @@ impl MotifSequenceDecomposer {
         }
 
         //  2. determine intervals, cutting off low-scoring possibilities
-        let intervals = self.compute_intervals(seq, &alignments, self.motif_alignment_score_cutoff, seq.len())?;
+        let intervals = self.compute_intervals(seq, &alignments, self.motif_alignment_score_cutoff)?;
 
         //  3: use weighted interval scheduling algorithm https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
         //     to find best sequence of motifs, with any 'idle' time being non-motif DNA in between motifs.
-        let (decomposition, score) = schedule(intervals);
+        let (schedule, score) = schedule(intervals);
+
+        //  4: build final decomposition items by interspersing gaps as needed
+        let mut decomposition = Vec::with_capacity(schedule.len());  // Size >= schedule.len()
+        let mut last_end = 0;
+
+        for d in schedule.into_iter() {
+            if d.start > last_end + 1 {
+                // Infill any gaps where we didn't decompose to any motif at all
+                decomposition.push(DecompositionItem::Gap(d.start - last_end - 1));
+            }
+            last_end = d.end;
+            decomposition.push(DecompositionItem::Alignment(d));
+        }
 
         Ok(MotifSequenceDecomposition {
             motif_set: self.motif_set.clone(),
