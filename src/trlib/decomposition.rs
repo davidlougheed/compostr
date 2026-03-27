@@ -448,7 +448,6 @@ impl MotifSequenceDecomposer {
         for (ai, f) in alignments.iter().enumerate() {
             let motif_size = f.0.len() - 1;
             let tbl = f.1.get_score_table()?;
-            eprintln!("scr {}", tbl);
 
             intervals.extend((0..seq_len).filter_map(|i| {
                 self.get_interval_from_score_matrix_start_pos(seq, f.0, &tbl, motif_size, i, cutoff)
