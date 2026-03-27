@@ -147,7 +147,7 @@ pub struct MotifSequenceDecomposer {
 #[derive(Clone, Debug)]
 pub struct MotifAlignmentInterval {
     start: usize, // inclusive, 0-based
-    end: usize, // inclusive, 0-based
+    end: usize,   // inclusive, 0-based
     pub score: i32,
     pub cigar: Vec<CigarItem>,
     motif_idx: usize, // Index of the motif in the motif set
@@ -364,28 +364,26 @@ impl MotifSequenceDecomposer {
 
                 let maxopt = match (ins_opt, match_opt, del_opt) {
                     (Some(i), Some(m), Some(d)) => {
-                        if i.2 > m.2 && i.2 >= d.2 { Some(i) }
-                        else if m.2 >= i.2 && m.2 >= d.2 { Some(m) }
-                        else { Some(d) } // if d.2 > m.2 && d.2 > i.2
-                    },
+                        Some(if i.2 > m.2 && i.2 >= d.2 {
+                            i
+                        } else if m.2 >= i.2 && m.2 >= d.2 {
+                            m
+                        } else {
+                            // if d.2 > m.2 && d.2 > i.2
+                            d
+                        })
+                    }
                     // two-option cases
-                    (Some(i), Some(m), None) => {
-                        if i.2 > m.2 { Some(i) } else { Some(m) }
-                    },
-                    (Some(i), None, Some(d)) => {
-                        if i.2 >= d.2 { Some(i) } else { Some(d) }
-                    },
-                    (None, Some(m), Some(d)) => {
-                        if m.2 >= d.2 { Some(m) } else { Some(d) }
-                    },
+                    (Some(i), Some(m), None) => Some(if i.2 > m.2 { i } else { m }),
+                    (Some(i), None, Some(d)) => Some(if i.2 >= d.2 { i } else { d }),
+                    (None, Some(m), Some(d)) => Some(if m.2 >= d.2 { m } else { d }),
                     // single cases
                     (Some(i), None, None) => Some(i),
                     (None, Some(m), None) => Some(m),
                     (None, None, Some(d)) => Some(d),
                     // base case
-                    (None, None, None) => None
+                    (None, None, None) => None,
                 };
-
 
                 // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow.
                 if let Some(mo) = maxopt {
