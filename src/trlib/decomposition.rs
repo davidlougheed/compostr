@@ -485,15 +485,6 @@ impl MotifSequenceDecomposer {
             score,
         })
     }
-
-    pub fn decomp_to_str(&self, decomp: &MotifSequenceDecomposition) -> Result<Vec<&str>, Utf8Error> {
-        let mut return_vec = Vec::new();
-        for i in decomp.decomposition.iter() {
-            let decomp_str: &str = str::from_utf8(self.motif_set.motifs[i.motif_idx].as_slice())?;
-            return_vec.push(decomp_str);
-        }
-        Ok(return_vec)
-    }
 }
 
 #[cfg(test)]
