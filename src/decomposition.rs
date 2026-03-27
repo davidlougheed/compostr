@@ -13,6 +13,7 @@ pub struct MotifSequenceDecomposition {
     pub motif_set: Arc<MotifSet>,
     pub decomposition: Vec<DecompositionItem>,
     pub score: i32, // Total weight achieved
+    pub copies: usize, // Total number of copies of any motif
 }
 
 pub enum DecompositionItem {
@@ -455,6 +456,7 @@ impl MotifSequenceDecomposer {
         //  3: use weighted interval scheduling algorithm https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
         //     to find best sequence of motifs, with any 'idle' time being non-motif DNA in between motifs.
         let (schedule, score) = schedule(intervals);
+        let copies = schedule.len();
 
         //  4: build final decomposition items by interspersing gaps as needed
         let mut decomposition = Vec::with_capacity(schedule.len());  // Size >= schedule.len()
@@ -473,6 +475,7 @@ impl MotifSequenceDecomposer {
             motif_set: self.motif_set.clone(),
             decomposition,
             score,
+            copies,
         })
     }
 }
@@ -483,14 +486,15 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    #[case(b"CAG".to_vec(), vec!["CAG"], "CAG\n|||\nCAG")]
-    #[case(b"CAAG".to_vec(), vec!["CAG"], "CA-G\n|| |\nCAAG")]
+    #[case(b"CAG".to_vec(), vec!["CAG"], "CAG\n|||\nCAG", 1)]
+    #[case(b"CAAG".to_vec(), vec!["CAG"], "CA-G\n|| |\nCAAG", 1)]
     #[case(
         b"CAGCAGCAGCAGCAGCAGCAGCAGCAG".to_vec(),
         vec!["CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG"],
         "CAGCAGCAGCAGCAGCAGCAGCAGCAG\n\
          |||||||||||||||||||||||||||\n\
          CAGCAGCAGCAGCAGCAGCAGCAGCAG",
+        9,
     )]
     #[case(
         b"CCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCAG".to_vec(),
@@ -499,6 +503,7 @@ mod tests {
         "CCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCAG\n\
          ||||||||||||||||||||||||||||||||||||||||||||||||\n\
          CCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCAG",
+        16,
     )]
     #[case(
         b"CAGCAGCGGCAGCAAG".to_vec(),
@@ -506,6 +511,7 @@ mod tests {
         "CAGCAGCCGCAGCA-G\n\
          |||||||X|||||| |\n\
          CAGCAGCGGCAGCAAG",
+        5,
     )]
     #[case(
         b"CAGCAGCAAGTTCAGCCGCCGCCCG".to_vec(),
@@ -513,12 +519,19 @@ mod tests {
         "CAGCAGCA-G  CAGCCGCCGCC-G\n\
          |||||||| |  ||||||||||| |\n\
          CAGCAGCAAGTTCAGCCGCCGCCCG",
+        7,
     )]
-    fn test_decomposition(#[case] seq: Vec<u8>, #[case] expected_decomp: Vec<&str>, #[case] expected_align_str: &str) {
+    fn test_decomposition(
+        #[case] seq: Vec<u8>,
+        #[case] expected_decomp: Vec<&str>,
+        #[case] expected_align_str: &str,
+        #[case] expected_copies: usize,
+    ) {
         let motif_set = MotifSet::new_from_strs(&vec!["CAG", "CCG"]);
         let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, Some(1));
         let res = decomposer.decompose(seq.as_slice()).unwrap();
         // assert_eq!(decomposer.decomp_to_str(&res).unwrap(), expected_decomp);
         assert_eq!(res.alignment_string(&seq), expected_align_str);
+        assert_eq!(res.copies, expected_copies);
     }
 }
