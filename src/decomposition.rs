@@ -1,8 +1,7 @@
 use parasail_rs::prelude::{Aligner, Alignment, Error, Matrix, Table};
 use smallvec::SmallVec;
-use std::cmp;
-use std::str::{self, Utf8Error};
 use std::sync::Arc;
+use std::{cmp, i32, usize};
 
 use crate::motif::MotifSet;
 
@@ -12,7 +11,7 @@ use crate::motif::MotifSet;
 pub struct MotifSequenceDecomposition {
     pub motif_set: Arc<MotifSet>,
     pub decomposition: Vec<DecompositionItem>,
-    pub score: i32, // Total weight achieved
+    pub score: i32,    // Total weight achieved
     pub copies: usize, // Total number of copies of any motif
 }
 
@@ -157,11 +156,9 @@ fn backtrack_schedule(
 
 /// Implementation of known weighted interval scheduling algorithm to do the motif decomposition
 /// See https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
+/// Requires an input vector already sorted by end position.
 /// Returns the best (or one of the best) schedules + its score.
-fn schedule(mut intervals: Vec<MotifAlignmentInterval>) -> (Vec<MotifAlignmentInterval>, i32) {
-    // sort intervals globally by earliest to latest end index
-    intervals.sort_unstable_by(|x, y| x.end.cmp(&y.end));
-
+fn schedule(intervals: Vec<MotifAlignmentInterval>) -> (Vec<MotifAlignmentInterval>, i32) {
     // p[j] is the index of the latest interval that ends before interval j begins
     let mut p = vec![0; intervals.len() + 1];
     for i in 1..intervals.len() + 1 {
@@ -197,7 +194,7 @@ fn schedule(mut intervals: Vec<MotifAlignmentInterval>) -> (Vec<MotifAlignmentIn
 /// DecompositionItem::Gap so that we have a contiguous record of alignment/gap for the whole sequence.
 fn interval_schedule_to_decomposition(schedule: Vec<MotifAlignmentInterval>, seq_len: usize) -> Vec<DecompositionItem> {
     let mut last_end = 0;
-    let mut decomposition = Vec::with_capacity(schedule.len());  // Size >= schedule.len()
+    let mut decomposition = Vec::with_capacity(schedule.len()); // Size >= schedule.len()
     for d in schedule.into_iter() {
         if d.start > last_end + 1 {
             // Infill any gaps where we didn't decompose to any motif at all
@@ -296,11 +293,12 @@ impl MotifSequenceDecomposer {
         &self,
         seq: &[u8],
         motif: &[u8],
+        motif_idx: usize,
         tbl: &Table,
         mut row: usize,
         end_col: usize,
         cutoff: i32,
-    ) -> Option<(usize, usize, i32, SmallVec<[CigarItem; 4]>)> {
+    ) -> Option<MotifAlignmentInterval> {
         let mut col = end_col;
 
         let score = tbl.get(row, col);
@@ -402,7 +400,13 @@ impl MotifSequenceDecomposer {
             cigar.push(current_op.to_cigar_item(current_op_count));
             cigar.reverse();
 
-            return Some((col, end_col, s, cigar));
+            return Some(MotifAlignmentInterval {
+                start: col,
+                end: end_col,
+                score: s,
+                cigar,
+                motif_idx: motif_idx,
+            });
         }
 
         None
@@ -410,31 +414,51 @@ impl MotifSequenceDecomposer {
 
     /// Given a set of motif alignments (with scoring tables) from Parasail plus an optional scoring cutoff, this function
     /// creates a vector of possible motif alignment intervals in the sequence. These will then be "scheduled" to produce
-    /// the sequence motif decomposition.
+    /// the sequence motif decomposition. The returned vector is naturally already sorted by end position.
     fn compute_intervals(
         &self,
         seq: &[u8],
-        alignments: &[(&[u8], Alignment)],
+        alignments: Vec<(&[u8], Alignment)>,
         motif_alignment_score_cutoff: Option<i32>,
     ) -> Result<Vec<MotifAlignmentInterval>, Error> {
         let mut intervals: Vec<MotifAlignmentInterval> = Vec::with_capacity(alignments.len() * seq.len());
         let cutoff = motif_alignment_score_cutoff.unwrap_or(i32::MIN);
 
-        for (ai, f) in alignments.iter().enumerate() {
-            let motif_size = f.0.len() - 1;
-            let tbl = f.1.get_score_table()?;
-
-            intervals.extend((0..seq.len()).filter_map(|i| {
-                self.get_interval_from_score_matrix_start_pos(seq, f.0, &tbl, motif_size, i, cutoff)
-                    .map(|iv| MotifAlignmentInterval {
-                        start: iv.0,
-                        end: iv.1,
-                        score: iv.2,
-                        cigar: iv.3,
-                        motif_idx: ai,
-                    })
-            }));
+        let mut tables: Vec<Table> = Vec::with_capacity(alignments.len());
+        for (_, a) in alignments.iter() {
+            tables.push(a.get_score_table()?);
         }
+
+        for i in 0..seq.len() {
+            let mut best_intervals_for_pos = SmallVec::<[MotifAlignmentInterval; 2]>::new();
+            let mut best_score: i32 = i32::MIN;
+            let mut best_score_len: usize = usize::MAX;
+
+            for ai in 0..alignments.len() {
+                let motif = alignments[ai].0;
+                let tbl = &tables[ai];
+                let iv = self.get_interval_from_score_matrix_start_pos(seq, motif, ai, tbl, motif.len() - 1, i, cutoff);
+                if let Some(interval) = iv {
+                    if (interval.score > best_score && interval.end - interval.start <= best_score_len)
+                        || (interval.score == best_score && interval.end - interval.start < best_score_len)
+                    {
+                        // cases where the interval is strictly better than the best one found so far:
+                        //  - it is above the best score and at most the same length (will replace in schedule for a better result)
+                        //  - it is the same score and shorter (will replace in schedule for more unallocated time)
+                        best_score = interval.score;
+                        best_score_len = interval.end - interval.start;
+                        best_intervals_for_pos.clear();
+                        best_intervals_for_pos.push(interval);
+                    } else if interval.score == best_score && interval.end - interval.start == best_score_len {
+                        // case where the interval is the same (for future use outputting multiple schedules):
+                        best_intervals_for_pos.push(interval);
+                    }
+                }
+            }
+
+            intervals.extend_from_slice(&best_intervals_for_pos);
+        }
+
         Ok(intervals)
     }
 
@@ -449,8 +473,8 @@ impl MotifSequenceDecomposer {
             alignments.push((m, self.aligner.align(Some(m), seq)?));
         }
 
-        //  2. determine intervals, cutting off low-scoring possibilities
-        let intervals = self.compute_intervals(seq, &alignments, self.motif_alignment_score_cutoff)?;
+        //  2. determine intervals, cutting off low-scoring possibilities; returns a vector already sorted by end pos.
+        let intervals = self.compute_intervals(seq, alignments, self.motif_alignment_score_cutoff)?;
 
         //  3: use weighted interval scheduling algorithm https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
         //     to find best sequence of motifs, with any 'idle' time being non-motif DNA in between motifs.
