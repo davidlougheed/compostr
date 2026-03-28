@@ -135,22 +135,21 @@ fn backtrack_schedule(
     mut intervals: Vec<MotifAlignmentInterval>,
     m: &Vec<i32>,
     p: &Vec<usize>,
-    j: usize,
+    mut j: usize,
 ) {
-    if j == 0 {
-        return;
-    }
-    if intervals[j - 1].score + m[p[j]] >= m[j - 1] {
-        // avoid clone by moving intervals[j - 1]; we're done with everything from [j - 1] forward anyway
-        // since we only ever decrement j (via p or via subtracting 1).
-        let next_item = {
-            let mut d = intervals.drain((j - 1)..);
-            d.next().expect("backtract_schedule: next item must exist")
-        };
-        final_schedule.push(next_item);
-        backtrack_schedule(final_schedule, intervals, m, p, p[j])
-    } else {
-        backtrack_schedule(final_schedule, intervals, m, p, j - 1)
+    while j > 0 {
+        if intervals[j - 1].score + m[p[j]] >= m[j - 1] {
+            // avoid clone by moving intervals[j - 1]; we're done with everything from [j - 1] forward anyway
+            // since we only ever decrement j (via p or via subtracting 1).
+            let next_item = {
+                let mut d = intervals.drain((j - 1)..);
+                d.next().expect("backtract_schedule: next item must exist")
+            };
+            final_schedule.push(next_item);
+            j = p[j];
+        } else {
+            j -= 1;
+        }
     }
 }
 
