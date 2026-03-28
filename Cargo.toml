@@ -16,3 +16,6 @@ rstest = "0.26.1"
 [[example]]
 name = "perf-benchmark"
 path = "examples/perf.rs"
+
+[profile.release]
+lto = true
