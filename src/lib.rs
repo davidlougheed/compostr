@@ -2,6 +2,7 @@
 pub mod decomposition;
 pub mod motif;
 // pub mod nw;
+pub mod scoring;
 
 #[cfg(test)]
 mod tests {

@@ -6,6 +6,7 @@ rust-version = "1.88.0"
 
 [dependencies]
 ndarray = "0.17.2"
+once_cell = "1.21.4"
 parasail-rs = "0.9.0"
 smallvec = "1.15.1"
 
