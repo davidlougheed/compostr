@@ -456,7 +456,7 @@ impl MotifSequenceDecomposer {
                 }
             }
 
-            intervals.extend_from_slice(&best_intervals_for_pos);
+            intervals.extend(best_intervals_for_pos);
         }
 
         Ok(intervals)
