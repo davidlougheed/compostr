@@ -1,7 +1,7 @@
 use parasail_rs::prelude::{Aligner, Alignment, Error, Table};
 use smallvec::SmallVec;
+use std::cmp;
 use std::sync::Arc;
-use std::{cmp, i32, usize};
 
 use crate::motif::MotifSet;
 use crate::scoring::{ScoringMatrix, ScoringMatrixError};
@@ -53,8 +53,6 @@ impl MotifSequenceDecomposition {
     /// Where the top string is generated from the motif set + the found decomposition, and the bottom string is the
     /// original sequence.
     pub fn alignment_string(&self, seq: &[u8]) -> String {
-        // TODO: use a view version of .items() for this function
-
         let mut query_strings = Vec::<String>::new();
         let mut align_strings = Vec::<String>::new();
         let mut seq_strings = Vec::<String>::new();
@@ -118,7 +116,7 @@ pub struct MotifSequenceDecomposer {
     gap_penalty: i32,
     aligner: Aligner,
     // interval computation parameters
-    motif_alignment_score_cutoff: Option<i32>,
+    motif_alignment_score_cutoff: i32,
 }
 
 /// Representation of a motif alignment to a sequence.
@@ -134,8 +132,8 @@ pub struct MotifAlignmentInterval {
 fn backtrack_schedule(
     final_schedule: &mut Vec<MotifAlignmentInterval>,
     mut intervals: Vec<MotifAlignmentInterval>,
-    m: &Vec<i32>,
-    p: &Vec<usize>,
+    m: &[i32],
+    p: &[usize],
     mut j: usize,
 ) {
     while j > 0 {
@@ -282,7 +280,7 @@ impl MotifSequenceDecomposer {
             mismatch_score,
             gap_penalty,
             aligner,
-            motif_alignment_score_cutoff,
+            motif_alignment_score_cutoff: motif_alignment_score_cutoff.unwrap_or(i32::MIN),
         })
     }
 
@@ -297,14 +295,13 @@ impl MotifSequenceDecomposer {
         tbl: &Table,
         mut row: usize,
         end_col: usize,
-        cutoff: i32,
     ) -> Option<MotifAlignmentInterval> {
         let mut col = end_col;
 
         let score = tbl.get(row, col);
 
         if let Some(s) = score
-            && s >= cutoff
+            && s >= self.motif_alignment_score_cutoff
         {
             // keep alignment of motif to sequence from traceback as well:
             let mut current_op: AlignmentItem = AlignmentItem::Match; // Dummy value to be replaced
@@ -405,7 +402,7 @@ impl MotifSequenceDecomposer {
                 end: end_col,
                 score: s,
                 cigar,
-                motif_idx: motif_idx,
+                motif_idx,
             });
         }
 
@@ -419,10 +416,8 @@ impl MotifSequenceDecomposer {
         &self,
         seq: &[u8],
         alignments: Vec<(&[u8], Alignment)>,
-        motif_alignment_score_cutoff: Option<i32>,
     ) -> Result<Vec<MotifAlignmentInterval>, Error> {
         let mut intervals: Vec<MotifAlignmentInterval> = Vec::with_capacity(alignments.len() * seq.len());
-        let cutoff = motif_alignment_score_cutoff.unwrap_or(i32::MIN);
 
         let mut tables: Vec<Table> = Vec::with_capacity(alignments.len());
         for (_, a) in alignments.iter() {
@@ -437,7 +432,7 @@ impl MotifSequenceDecomposer {
             for ai in 0..alignments.len() {
                 let motif = alignments[ai].0;
                 let tbl = &tables[ai];
-                let iv = self.get_interval_from_score_matrix_start_pos(seq, motif, ai, tbl, motif.len() - 1, i, cutoff);
+                let iv = self.get_interval_from_score_matrix_start_pos(seq, motif, ai, tbl, motif.len() - 1, i);
                 if let Some(interval) = iv {
                     if (interval.score > best_score && interval.end - interval.start <= best_score_len)
                         || (interval.score == best_score && interval.end - interval.start < best_score_len)
@@ -474,7 +469,7 @@ impl MotifSequenceDecomposer {
         }
 
         //  2. determine intervals, cutting off low-scoring possibilities; returns a vector already sorted by end pos.
-        let intervals = self.compute_intervals(seq, alignments, self.motif_alignment_score_cutoff)?;
+        let intervals = self.compute_intervals(seq, alignments)?;
 
         //  3: use weighted interval scheduling algorithm https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
         //     to find best sequence of motifs, with any 'idle' time being non-motif DNA in between motifs.
