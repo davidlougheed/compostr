@@ -79,14 +79,14 @@ impl ScoringMatrix {
     pub fn new_iupac_dna(match_score: i32, mismatch_score: i32) -> Result<Self, ScoringMatrixError> {
         Ok(ScoringMatrix {
             matrix: make_parasail_matrix(false, match_score, mismatch_score)
-                .map_err(|e| ScoringMatrixError::ParasailError(e))?,
+                .map_err(ScoringMatrixError::ParasailError)?,
         })
     }
 
     pub fn new_iupac_rna(match_score: i32, mismatch_score: i32) -> Result<Self, ScoringMatrixError> {
         Ok(ScoringMatrix {
             matrix: make_parasail_matrix(true, match_score, mismatch_score)
-                .map_err(|e| ScoringMatrixError::ParasailError(e))?,
+                .map_err(ScoringMatrixError::ParasailError)?,
         })
     }
 }
