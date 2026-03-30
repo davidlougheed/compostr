@@ -22,6 +22,8 @@ pub enum DecompositionItem {
 }
 
 impl MotifSequenceDecomposition {
+    /// Returns a vector of CIGAR items representing the alignment of a sequence just composed of motifs from the
+    /// motif set against the original sequence.
     pub fn cigar(&self) -> Vec<CigarItem> {
         let mut cigars = Vec::<CigarItem>::new();
         for d in self.decomposition.iter() {
@@ -38,9 +40,30 @@ impl MotifSequenceDecomposition {
         cigars
     }
 
+    /// Returns a string representation of .cigar()
     pub fn cigar_string(&self) -> String {
         let cigar_strings: Vec<String> = self.cigar().into_iter().map(|c| c.to_alignment_string()).collect();
         cigar_strings.join("")
+    }
+
+    /// Given the original sequence, returns the decomposition of it into sub-slices.
+    pub fn sequence_items<'a>(&self, seq: &'a [u8], with_unmapped: bool) -> Vec<&'a [u8]> {
+        let mut res: Vec<&'a [u8]> = Vec::new();
+        let mut last_end = 0;
+        for d in self.decomposition.iter() {
+            match d {
+                DecompositionItem::Alignment(a) => {
+                    res.push(&seq[a.start..a.end + 1]);
+                    last_end = a.end;
+                }
+                DecompositionItem::Gap(g) => {
+                    if with_unmapped {
+                        res.push(&seq[last_end + 1..last_end + g + 1]);
+                    }
+                }
+            };
+        }
+        res
     }
 
     /// Returns a human-readable alignment string representation given the originally decomposed string, which will
@@ -495,7 +518,7 @@ mod tests {
 
     #[rstest]
     #[case(b"CAG".to_vec(), vec!["CAG"], "CAG\n|||\nCAG", 1)]
-    #[case(b"CAAG".to_vec(), vec!["CAG"], "CA-G\n|| |\nCAAG", 1)]
+    #[case(b"CAAG".to_vec(), vec!["CAAG"], "CA-G\n|| |\nCAAG", 1)]
     #[case(
         b"CAGCAGCAGCAGCAGCAGCAGCAGCAG".to_vec(),
         vec!["CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG", "CAG"],
@@ -538,7 +561,8 @@ mod tests {
         let motif_set = MotifSet::new_from_strs(&vec!["CAG", "CCG"]);
         let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, Some(1)).unwrap();
         let res = decomposer.decompose(seq.as_slice()).unwrap();
-        // assert_eq!(decomposer.decomp_to_str(&res).unwrap(), expected_decomp);
+        let expected_decomp_u8: Vec<&[u8]> = expected_decomp.iter().map(|c| c.as_bytes()).collect();
+        assert_eq!(res.sequence_items(&seq, true), expected_decomp_u8);
         assert_eq!(res.alignment_string(&seq), expected_align_str);
         assert_eq!(res.copies, expected_copies);
     }
