@@ -320,12 +320,12 @@ impl MotifSequenceDecomposer {
         end_col: usize,
     ) -> Option<MotifAlignmentInterval> {
         let mut col = end_col;
+        let tbl_slice = tbl.as_slice();
+        let tbl_cols = tbl.cols();
 
-        let score = tbl.get(row, col);
+        let score = tbl_slice[row * tbl_cols + col];
 
-        if let Some(s) = score
-            && s >= self.motif_alignment_score_cutoff
-        {
+        if score >= self.motif_alignment_score_cutoff {
             // keep alignment of motif to sequence from traceback as well:
             let mut current_op: AlignmentItem = AlignmentItem::Match; // Dummy value to be replaced
             let mut current_op_count: usize = 0;
@@ -334,50 +334,43 @@ impl MotifSequenceDecomposer {
 
             while row > 0 {
                 // Instead of keeping options in vec, save a lot of time by just enumerating every possible comparison
-                let mut ins_opt: Option<(usize, usize, i32, AlignmentItem)> = None;
-                let mut match_opt: Option<(usize, usize, i32, AlignmentItem)> = None;
-                let mut del_opt: Option<(usize, usize, i32, AlignmentItem)> = None;
-
-                if col > 0 {
+                let (ins_opt, match_opt) = if col > 0 {
                     // TODO: this doesn't support affine gap properly
-                    if let Some(left) = tbl.get(row, col - 1) {
-                        ins_opt = Some((row, col - 1, left - self.gap_penalty, AlignmentItem::Ins));
-                    }
-                    if let Some(diag) = tbl.get(row - 1, col - 1) {
-                        let (sc, ait) = if motif[row - 1] == seq[col - 1] {
-                            (self.match_score, AlignmentItem::Match)
-                        } else {
-                            (self.mismatch_score, AlignmentItem::Mismatch)
-                        };
-                        match_opt = Some((row - 1, col - 1, diag + sc, ait));
-                    }
-                }
+                    let left = tbl_slice[row * tbl_cols + (col - 1)];
+                    let diag = tbl_slice[(row - 1) * tbl_cols + (col - 1)];
+                    let (sc, ait) = if motif[row - 1] == seq[col - 1] {
+                        (self.match_score, AlignmentItem::Match)
+                    } else {
+                        (self.mismatch_score, AlignmentItem::Mismatch)
+                    };
+                    (
+                        // insertion
+                        Some((row, col - 1, left - self.gap_penalty, AlignmentItem::Ins)),
+                        // match or mismatch
+                        Some((row - 1, col - 1, diag + sc, ait)),
+                    )
+                } else {
+                    (None, None)
+                };
                 // TODO: this doesn't support affine gap properly
-                if let Some(up) = tbl.get(row - 1, col) {
-                    del_opt = Some((row - 1, col, up - self.gap_penalty, AlignmentItem::Del));
-                }
+                let up = tbl_slice[(row - 1) * tbl_cols + col];
+                let del_opt = (row - 1, col, up - self.gap_penalty, AlignmentItem::Del);
 
-                let maxopt = match (ins_opt, match_opt, del_opt) {
-                    (Some(i), Some(m), Some(d)) => {
-                        Some(if i.2 > m.2 && i.2 >= d.2 {
+                let maxopt = match (ins_opt, match_opt) {
+                    (Some(i), Some(m)) => {
+                        Some(if i.2 > m.2 && i.2 >= del_opt.2 {
                             i
-                        } else if m.2 >= i.2 && m.2 >= d.2 {
+                        } else if m.2 >= i.2 && m.2 >= del_opt.2 {
                             m
                         } else {
                             // if d.2 > m.2 && d.2 > i.2
-                            d
+                            del_opt
                         })
                     }
-                    // two-option cases
-                    (Some(i), Some(m), None) => Some(if i.2 > m.2 { i } else { m }),
-                    (Some(i), None, Some(d)) => Some(if i.2 >= d.2 { i } else { d }),
-                    (None, Some(m), Some(d)) => Some(if m.2 >= d.2 { m } else { d }),
-                    // single cases
-                    (Some(i), None, None) => Some(i),
-                    (None, Some(m), None) => Some(m),
-                    (None, None, Some(d)) => Some(d),
+                    (Some(i), None) => Some(if i.2 >= del_opt.2 { i } else { del_opt }),
+                    (None, Some(m)) => Some(if m.2 >= del_opt.2 { m } else { del_opt }),
                     // base case
-                    (None, None, None) => None,
+                    (None, None) => None,
                 };
 
                 // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow.
@@ -423,7 +416,7 @@ impl MotifSequenceDecomposer {
             return Some(MotifAlignmentInterval {
                 start: col,
                 end: end_col,
-                score: s,
+                score,
                 cigar,
                 motif_idx,
             });
@@ -497,7 +490,7 @@ impl MotifSequenceDecomposer {
         //  3: use weighted interval scheduling algorithm https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
         //     to find best sequence of motifs, with any 'idle' time being non-motif DNA in between motifs.
         let (schedule, score) = schedule(intervals);
-        let copies = schedule.len();
+        let copies = schedule.len(); // Copy number of tandem repeat
 
         //  4: build final decomposition items by interspersing gaps as needed
         let decomposition = interval_schedule_to_decomposition(schedule, seq.len());
