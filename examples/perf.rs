@@ -5,7 +5,7 @@ use trlib::motif::MotifSet;
 
 fn main() {
     let motif_set = MotifSet::new_from_strs(&vec!["CAG", "CCG"]);
-    let seq = b"CCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCAG".to_vec();
+    let seq = b"CCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCAGCAGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCCGCAG".to_vec();
     let d = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, Some(1)).unwrap();
 
     let t = SystemTime::now();
