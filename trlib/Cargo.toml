@@ -1,0 +1,19 @@
+[package]
+name = "trlib"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88.0"
+
+[dependencies]
+ndarray = "0.17.2"
+once_cell = "1.21.4"
+parasail-rs = "0.9.0"
+smallvec = "1.15.1"
+
+[dev-dependencies]
+rstest = "0.26.1"
+
+[lib]
+[[example]]
+name = "perf-benchmark"
+path = "examples/perf.rs"
