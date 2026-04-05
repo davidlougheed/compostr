@@ -36,6 +36,23 @@ usual, meaning we may get imperfect or erroneous motif copies.
 which allows for non-canonical motifs or even non-repeat DNA inserted into the sequence.
 
 
+## Development
+
+### Basic Performance Testing
+
+First, you'll need [samply](https://github.com/mstange/samply) to record performance.
+
+Then, the basic performance-checking example (which just does decomposition on a fixed string) can be profiled using the
+following command:
+
+```bash
+CARGO_PROFILE_RELEASE_DEBUG=true samply record cargo run --profile release --example perf-benchmark
+```
+
+The first time this is run, the profile will include compilation (and thus won't be very useful). Run it again to use
+the already-compiled library to get the profile of the actual performance benchmark example.
+
+
 ## Copyright Notice
 
 &copy; David Lougheed and Aidon Lebar 2026.
