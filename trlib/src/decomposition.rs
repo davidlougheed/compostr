@@ -84,7 +84,7 @@ impl MotifSequenceDecomposition {
         for d in self.decomposition.iter() {
             match d {
                 DecompositionItem::Alignment(a) => {
-                    let m = &self.motif_set.motifs[a.motif_idx];
+                    let m = &self.motif_set[a.motif_idx];
                     let mut qi = 0;
                     let mut ri = a.start;
                     for item in a.cigar.iter() {
@@ -494,8 +494,8 @@ impl MotifSequenceDecomposer {
         // rough algorithm outline, 3 parts:
 
         //  1: align all motifs (ends-free) to sequence to get alignment score matrix
-        let mut alignments: Vec<(&[u8], Alignment)> = Vec::with_capacity(self.motif_set.motifs.len());
-        for m in self.motif_set.motifs.iter() {
+        let mut alignments: Vec<(&[u8], Alignment)> = Vec::with_capacity(self.motif_set.len());
+        for m in self.motif_set.iter() {
             alignments.push((m, self.aligner.align(Some(m), seq)?));
         }
 

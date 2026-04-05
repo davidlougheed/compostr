@@ -1,5 +1,7 @@
+use std::ops::Index;
+
 pub struct MotifSet {
-    pub motifs: Vec<Vec<u8>>,
+    motifs: Vec<Vec<u8>>,
 }
 
 impl MotifSet {
@@ -9,6 +11,22 @@ impl MotifSet {
 
     pub fn new_from_strs(motifs: &[&str]) -> Self {
         MotifSet::new(motifs.iter().map(|&m| m.bytes().collect()).collect())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Vec<u8>> {
+        self.motifs.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.motifs.len()
+    }
+}
+
+impl Index<usize> for MotifSet {
+    type Output = Vec<u8>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.motifs[index]
     }
 }
 
