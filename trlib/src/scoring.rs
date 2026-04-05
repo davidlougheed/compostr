@@ -2,7 +2,8 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
-use parasail_rs::prelude::{Error, Matrix};
+use parasail_rs::prelude::{Error as PError, Matrix};
+use thiserror::Error;
 
 fn make_iupac_lookup(t_base: u8) -> HashMap<u8, Vec<u8>> {
     let mut lookup = HashMap::new();
@@ -39,9 +40,10 @@ static IUPAC_CODE_DNA_LOOKUP: Lazy<HashMap<u8, Vec<u8>>> = Lazy::new(|| make_iup
 /// Lookup from IUPAC code to canonical RNA base
 static IUPAC_CODE_RNA_LOOKUP: Lazy<HashMap<u8, Vec<u8>>> = Lazy::new(|| make_iupac_lookup(b'U'));
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ScoringMatrixError {
-    ParasailError(Error),
+    #[error("error from Parasail: {0}")]
+    ParasailError(PError),
 }
 
 /// Right now essentially just a wrapper for parasail-rs's Matrix struct so that we can define the API.
@@ -49,7 +51,7 @@ pub struct ScoringMatrix {
     pub matrix: Matrix,
 }
 
-fn make_parasail_matrix(is_rna: bool, match_score: i32, mismatch_score: i32) -> Result<Matrix, Error> {
+fn make_parasail_matrix(is_rna: bool, match_score: i32, mismatch_score: i32) -> Result<Matrix, PError> {
     let alphabet = if is_rna { IUPAC_RNA_ALPHABET } else { IUPAC_DNA_ALPHABET };
     let mut matrix = Matrix::create(alphabet, match_score, mismatch_score)?;
 
