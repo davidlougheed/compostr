@@ -262,10 +262,10 @@ pub enum CigarItem {
 impl CigarItem {
     pub fn to_cigar_string(&self) -> String {
         match self {
-            Self::Ins(c) => format!("{}I", c),
-            Self::Del(c) => format!("{}D", c),
-            Self::Match(c) => format!("{}=", c),
-            Self::Mismatch(c) => format!("{}X", c),
+            Self::Ins(c) => format!("{c}I"),
+            Self::Del(c) => format!("{c}D"),
+            Self::Match(c) => format!("{c}="),
+            Self::Mismatch(c) => format!("{c}X"),
         }
     }
 
@@ -571,7 +571,7 @@ mod tests {
     #[rstest]
     #[case(
         b"GTGAGGATGATGGGAGTGTGCGCAGTGTAAGGATGATGGGAGTGTGTGCAATGTGAGGATGATGGGAGTGTGCACAGTGTGAGGACGATGGGAGTGTGCG".to_vec(),
-        &format!("{}{}{}", L1, L2, L3),
+        &format!("{L1}{L2}{L3}"),
         3,
     )]
     fn test_decomposition_2(#[case] seq: Vec<u8>, #[case] expected_align_str: &str, #[case] expected_copies: usize) {
