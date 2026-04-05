@@ -307,6 +307,59 @@ impl MotifSequenceDecomposer {
         })
     }
 
+    /// Maximum-scoring option function for semi-global alignment traceback
+    fn sg_traceback_max_opt(
+        &self,
+        motif: &[u8],
+        seq: &[u8],
+        row: usize,
+        col: usize,
+        tbl_slice: &[i32],
+        tbl_cols: usize,
+    ) -> Option<(usize, usize, i32, AlignmentItem)> {
+        // Instead of keeping options in vec, save a lot of time by just enumerating every possible comparison
+        let (ins_opt, match_opt) = if col > 0 {
+            // TODO: this doesn't support affine gap properly
+            let left = tbl_slice[row * tbl_cols + (col - 1)];
+            let diag = tbl_slice[(row - 1) * tbl_cols + (col - 1)];
+            let (sc, ait) = if motif[row - 1] == seq[col - 1] {
+                (self.match_score, AlignmentItem::Match)
+            } else {
+                (self.mismatch_score, AlignmentItem::Mismatch)
+            };
+            (
+                // insertion
+                Some((row, col - 1, left - self.gap_penalty, AlignmentItem::Ins)),
+                // match or mismatch
+                Some((row - 1, col - 1, diag + sc, ait)),
+            )
+        } else {
+            (None, None)
+        };
+        // TODO: this doesn't support affine gap properly
+        let up = tbl_slice[(row - 1) * tbl_cols + col];
+        let del_opt = (row - 1, col, up - self.gap_penalty, AlignmentItem::Del);
+
+        let maxopt = match (ins_opt, match_opt) {
+            (Some(i), Some(m)) => {
+                Some(if i.2 > m.2 && i.2 >= del_opt.2 {
+                    i
+                } else if m.2 >= i.2 && m.2 >= del_opt.2 {
+                    m
+                } else {
+                    // if d.2 > m.2 && d.2 > i.2
+                    del_opt
+                })
+            }
+            (Some(i), None) => Some(if i.2 >= del_opt.2 { i } else { del_opt }),
+            (None, Some(m)) => Some(if m.2 >= del_opt.2 { m } else { del_opt }),
+            // base case (should never happen)
+            (None, None) => None,
+        };
+
+        maxopt
+    }
+
     /// Given a motif-sequence alignment table and an ending row/col for an alignment, trace back the alignment to return
     /// an interval tuple of: (starting sequence position, ending sequence position, score, CIGAR for the interval).
     /// This tuple will be used to build a MotifAlignmentInterval struct downstream.
@@ -333,45 +386,7 @@ impl MotifSequenceDecomposer {
             let mut cigar: SmallVec<[CigarItem; 4]> = SmallVec::new();
 
             while row > 0 {
-                // Instead of keeping options in vec, save a lot of time by just enumerating every possible comparison
-                let (ins_opt, match_opt) = if col > 0 {
-                    // TODO: this doesn't support affine gap properly
-                    let left = tbl_slice[row * tbl_cols + (col - 1)];
-                    let diag = tbl_slice[(row - 1) * tbl_cols + (col - 1)];
-                    let (sc, ait) = if motif[row - 1] == seq[col - 1] {
-                        (self.match_score, AlignmentItem::Match)
-                    } else {
-                        (self.mismatch_score, AlignmentItem::Mismatch)
-                    };
-                    (
-                        // insertion
-                        Some((row, col - 1, left - self.gap_penalty, AlignmentItem::Ins)),
-                        // match or mismatch
-                        Some((row - 1, col - 1, diag + sc, ait)),
-                    )
-                } else {
-                    (None, None)
-                };
-                // TODO: this doesn't support affine gap properly
-                let up = tbl_slice[(row - 1) * tbl_cols + col];
-                let del_opt = (row - 1, col, up - self.gap_penalty, AlignmentItem::Del);
-
-                let maxopt = match (ins_opt, match_opt) {
-                    (Some(i), Some(m)) => {
-                        Some(if i.2 > m.2 && i.2 >= del_opt.2 {
-                            i
-                        } else if m.2 >= i.2 && m.2 >= del_opt.2 {
-                            m
-                        } else {
-                            // if d.2 > m.2 && d.2 > i.2
-                            del_opt
-                        })
-                    }
-                    (Some(i), None) => Some(if i.2 >= del_opt.2 { i } else { del_opt }),
-                    (None, Some(m)) => Some(if m.2 >= del_opt.2 { m } else { del_opt }),
-                    // base case
-                    (None, None) => None,
-                };
+                let maxopt = self.sg_traceback_max_opt(motif, seq, row, col, tbl_slice, tbl_cols);
 
                 // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow.
                 if let Some(mo) = maxopt {
