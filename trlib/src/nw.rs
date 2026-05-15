@@ -32,15 +32,57 @@ impl Aligner {
     }
 
     pub fn align_motif_to_seq(motif: &[u8], seq: &[u8]) -> Alignment {
-        let mut m_score: Array2<i32> = Array::zeros((seq.len() + 1, motif.len() + 1));
-        // TODO: first col with gaps
+        let seq_len = seq.len();
+        let motif_len = motif.len();
+        let mut m_score: Array2<i32> = Array::zeros((seq_len + 1, motif_len + 1));
+        for i in 1..seq_len {
+             m_score[i][0] = -i;
+        }
+        for i in 1..motif_len{
+            m_score[0][i] = -i;
+        }
 
         let mut m_trace: Array2<TraceItem> = Array::from_elem((seq.len() + 1, motif.len() + 1), TraceItem::Unset);
         m_trace[[0, 0]] = TraceItem::Done;
 
-        // for i in 0..seq.len() {
-        //     for
-        // }
+        for i in 1..seq_len {
+            let mut x = i;
+            let mut y = 1;
+            //iterate the diagonal
+            while y <= motif_len && x > 0 {
+                //up
+                if m_trace[x][y-1] == TraceItem::Up || m_trace[x][y-1] == TraceItem::Left {
+                    let up = m_score[x][y-1] + self.gap_extend;
+                } else {
+                    let up = m_score[x][y-1] + self.gap_open;
+                }
+                //left
+                if m_trace[x-1][y] == TraceItem::Up || m_trace[x-1][y] == TraceItem::Left {
+                    let left = m_score[x-1][y] + self.gap_extend;
+                } else {
+                    let left = m_score[x-1][y] + self.gap_open;
+                }
+                //(mis)match - upleft
+                if motif[y] == seq[x] {
+                    let upleft = m_score[x-1][y -1] + self.match_score;
+                } else {
+                    let upleft = m_score[x-1][y -1] + self.mismatch_score;
+                }
+
+                if up > upleft && up > left {
+                    m_score[x][y] = up;
+                    m_trace[x][y] = TraceItem::Up;
+                } else if left > upleft && left > up {
+                    m_score[x][y] = left;
+                    m_trace[x][y] = TraceItem::Left;
+                } else {
+                    m_score[x][y] = upleft;
+                    m_trace[x][y] = TraceItem::Diag;
+                }
+                x -= 1;
+                y += 1;
+            }
+        }
 
         Alignment { m_score, m_trace }
     }
