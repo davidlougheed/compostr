@@ -4,6 +4,8 @@
 tandem repeat motif decomposition and consensus sequence calculation library, primarily for use in tandem repeat
 genotyping ([STRkit](https://github.com/davidlougheed/strkit/)) and, eventually, for telomere analysis.
 
+**Note:** This library is under active development and not ready for use yet.
+
 
 ## Motivation
 
