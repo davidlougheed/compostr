@@ -667,9 +667,18 @@ dependencies = [
  "ndarray",
  "once_cell",
  "parasail-rs",
+ "pyo3",
  "rstest",
  "smallvec",
  "thiserror",
+]
+
+[[package]]
+name = "trlib_py"
+version = "0.1.0"
+dependencies = [
+ "pyo3",
+ "trlib",
 ]
 
 [[package]]
