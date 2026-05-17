@@ -1,7 +1,7 @@
-# trlib
+# compostr: <span style="text-decoration: underline">compos</span>ition analysis of <span style="text-decoration: underline">t</span>andem <span style="text-decoration: underline">r</span>epeats
 
-`trlib` is a tandem repeat motif decomposition and consensus sequence calculation library, primarily for use by
-[STRkit](https://github.com/davidlougheed/strkit/) and `telokit`.
+`compostr` is a tandem repeat motif decomposition and consensus sequence calculation library, primarily for use in
+tandem repeat genotyping ([STRkit](https://github.com/davidlougheed/strkit/)) and, eventually, for telomere analysis.
 
 
 ## Motivation
