@@ -491,6 +491,16 @@ impl MotifSequenceDecomposer {
     /// Main functionality for MotifSequenceDecomposer - given a sequence, decomposes it into motifs using the motif
     /// set and alignment parameters that were specified for the decomposer instance.
     pub fn decompose(&self, seq: &[u8]) -> Result<MotifSequenceDecomposition, Error> {
+        // early return in blank case
+        if seq == b"" {
+            return Ok(MotifSequenceDecomposition {
+                motif_set: self.motif_set.clone(),
+                decomposition: Vec::new(),
+                score: 0,
+                copies: 0,
+            });
+        }
+
         // rough algorithm outline, 3 parts:
 
         //  1: align all motifs (ends-free) to sequence to get alignment score matrix
@@ -525,6 +535,7 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
+    #[case(b"".to_vec(), vec![], "\n\n", 0)]
     #[case(b"CAG".to_vec(), vec!["CAG"], "CAG\n|||\nCAG", 1)]
     #[case(b"CAAG".to_vec(), vec!["CAAG"], "CA-G\n|| |\nCAAG", 1)]
     #[case(
