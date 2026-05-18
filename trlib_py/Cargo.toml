@@ -1,0 +1,13 @@
+[package]
+name = "trlib_py"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88.0"
+
+[lib]
+name = "trlib_py"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.28.3", features = ["generate-import-lib"] }
+trlib = { path = "../trlib", features = ["pyo3"] }
