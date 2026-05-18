@@ -20,6 +20,10 @@ impl MotifSet {
     pub fn len(&self) -> usize {
         self.motifs.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        return self.motifs.is_empty()
+    }
 }
 
 impl Index<usize> for MotifSet {
