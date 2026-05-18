@@ -22,7 +22,7 @@ impl MotifSet {
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.motifs.is_empty()
+        self.motifs.is_empty()
     }
 }
 
