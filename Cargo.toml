@@ -1,5 +1,5 @@
 [workspace]
-members = ["trlib"]
+members = ["trlib", "trlib_cli"]
 resolver = "3"
 
 [profile.release]
