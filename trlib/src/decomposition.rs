@@ -608,8 +608,17 @@ mod tests {
     fn test_decomposition_2(#[case] seq: Vec<u8>, #[case] expected_align_str: &str, #[case] expected_copies: usize) {
         let motif_set = MotifSet::new_from_strs(&vec!["GATGATGGGAGTGTGCGCAGTGTAAG"]);
         let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, Some(-2)).unwrap();
-        let res = decomposer.decompose(seq.as_slice()).unwrap();
+        let res = decomposer.decompose(&seq).unwrap();
         assert_eq!(res.alignment_string(&seq), expected_align_str);
         assert_eq!(res.copies, expected_copies);
+    }
+
+    #[rstest]
+    #[case(b"TTTTTATTTTTATTTTTTATTTTTCTT".to_vec(), 4)]
+    fn test_decomposition_3(#[case] seq: Vec<u8>, #[case] copies: usize) {
+        let motif_set = MotifSet::new_from_strs(&vec!["TTTTTAT"]);
+        let decomposer = MotifSequenceDecomposer::new(motif_set, 4, -4, 5, Some(-1)).unwrap();
+        let res = decomposer.decompose(seq.as_slice()).unwrap();
+        assert_eq!(res.copies, copies);
     }
 }
