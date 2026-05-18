@@ -184,13 +184,17 @@ fn schedule(intervals: Vec<MotifAlignmentInterval>) -> (Vec<MotifAlignmentInterv
     let mut p = vec![0; intervals.len() + 1];
     for i in 1..intervals.len() + 1 {
         let mut n = i - 1;
-        while n > 0 {
+        loop {
             if intervals[n].end < intervals[i - 1].start {
                 // interval coordinates are inclusive, so use '<'
                 p[i] = n + 1;
                 break;
             }
-            n -= 1;
+            if n > 0 {
+                n -= 1;
+            } else {
+                break;
+            }
         }
     }
 
