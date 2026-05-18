@@ -345,7 +345,7 @@ impl MotifSequenceDecomposer {
         let up = tbl_slice[(row - 1) * tbl_cols + col];
         let del_opt = (row - 1, col, up - self.gap_penalty, AlignmentItem::Del);
 
-        let maxopt = match (ins_opt, match_opt) {
+        match (ins_opt, match_opt) {
             (Some(i), Some(m)) => {
                 Some(if i.2 > m.2 && i.2 >= del_opt.2 {
                     i
@@ -360,9 +360,7 @@ impl MotifSequenceDecomposer {
             (None, Some(m)) => Some(if m.2 >= del_opt.2 { m } else { del_opt }),
             // base case (should never happen)
             (None, None) => None,
-        };
-
-        maxopt
+        }
     }
 
     /// Given a motif-sequence alignment table and an ending row/col for an alignment, trace back the alignment to return
