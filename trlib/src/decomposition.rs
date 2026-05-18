@@ -16,6 +16,7 @@ pub struct MotifSequenceDecomposition {
     pub copies: usize, // Total number of copies of any motif
 }
 
+#[derive(Debug)]
 pub enum DecompositionItem {
     Alignment(MotifAlignmentInterval),
     Gap(usize),
