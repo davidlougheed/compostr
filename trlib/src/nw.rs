@@ -12,6 +12,7 @@ pub enum TraceItem {
 pub struct Alignment {
     m_score: Array2<i32>,
     m_trace: Array2<TraceItem>,
+    m_gap_len: Array2<i32>,
 }
 
 pub struct Aligner {
@@ -35,15 +36,11 @@ impl Aligner {
         let seq_len = seq.len();
         let motif_len = motif.len();
         let mut m_score: Array2<i32> = Array::zeros((seq_len + 1, motif_len + 1));
-        for i in 1..seq_len {
-             m_score[[i,0]] = -(i as i32);
-        }
-        for i in 1..motif_len{
-            m_score[[0,i]] = -(i as i32);
-        }
 
         let mut m_trace: Array2<TraceItem> = Array::from_elem((seq.len() + 1, motif.len() + 1), TraceItem::Unset);
         m_trace[[0, 0]] = TraceItem::Done;
+
+        let mut m_gap_len: Array2<i32> = Array::zeros((seq_len + 1, motif_len + 1));
 
         for i in 1..seq_len {
             let mut x = i;
@@ -82,7 +79,7 @@ impl Aligner {
             }
         }
 
-        Alignment { m_score, m_trace }
+        Alignment { m_score, m_trace, m_gap_len}
     }
 }
 
