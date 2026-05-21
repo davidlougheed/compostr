@@ -51,16 +51,14 @@ impl Aligner {
             //iterate the diagonal
             while y <= motif_len && x > 0 {
                 //up
-                let up = if m_trace[[x,y-1]] == TraceItem::Up || m_trace[[x,y-1]] == TraceItem::Left {
-                    m_score[[x,y-1]] + self.gap_extend
-                } else {
-                    m_score[[x,y-1]] + self.gap_open
+                let up = match m_trace[[x,y-1]] {
+                    TraceItem::Up | TraceItem::Left => m_score[[x,y-1]] + self.gap_extend,
+                    _ => m_score[[x,y-1]] + self.gap_open
                 };
                 //left
-                let left = if m_trace[[x-1,y]] == TraceItem::Up || m_trace[[x-1,y]] == TraceItem::Left {
-                    m_score[[x-1,y]] + self.gap_extend
-                } else {
-                    m_score[[x-1,y]] + self.gap_open
+                let left = match m_trace[[x-1,y]] {
+                    TraceItem::Up | TraceItem::Left => m_score[[x-1,y]] + self.gap_extend,
+                    _ => m_score[[x-1,y]] + self.gap_open
                 };
                 //(mis)match - upleft
                 let upleft = if motif[y] == seq[x] {
