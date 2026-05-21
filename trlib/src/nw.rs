@@ -31,15 +31,15 @@ impl Aligner {
         }
     }
 
-    pub fn align_motif_to_seq(motif: &[u8], seq: &[u8]) -> Alignment {
+    pub fn align_motif_to_seq(self, motif: &[u8], seq: &[u8]) -> Alignment {
         let seq_len = seq.len();
         let motif_len = motif.len();
         let mut m_score: Array2<i32> = Array::zeros((seq_len + 1, motif_len + 1));
         for i in 1..seq_len {
-             m_score[i][0] = -i;
+             m_score[i][0] = -(i as i32);
         }
         for i in 1..motif_len{
-            m_score[0][i] = -i;
+            m_score[0][i] = -(i as i32);
         }
 
         let mut m_trace: Array2<TraceItem> = Array::from_elem((seq.len() + 1, motif.len() + 1), TraceItem::Unset);
@@ -51,23 +51,23 @@ impl Aligner {
             //iterate the diagonal
             while y <= motif_len && x > 0 {
                 //up
-                if m_trace[x][y-1] == TraceItem::Up || m_trace[x][y-1] == TraceItem::Left {
-                    let up = m_score[x][y-1] + self.gap_extend;
+                let up = if m_trace[x][y-1] == TraceItem::Up || m_trace[x][y-1] == TraceItem::Left {
+                    m_score[x][y-1] + self.gap_extend
                 } else {
-                    let up = m_score[x][y-1] + self.gap_open;
-                }
+                    m_score[x][y-1] + self.gap_open
+                };
                 //left
-                if m_trace[x-1][y] == TraceItem::Up || m_trace[x-1][y] == TraceItem::Left {
-                    let left = m_score[x-1][y] + self.gap_extend;
+                let left = if m_trace[x-1][y] == TraceItem::Up || m_trace[x-1][y] == TraceItem::Left {
+                    m_score[x-1][y] + self.gap_extend
                 } else {
-                    let left = m_score[x-1][y] + self.gap_open;
-                }
+                    m_score[x-1][y] + self.gap_open
+                };
                 //(mis)match - upleft
-                if motif[y] == seq[x] {
-                    let upleft = m_score[x-1][y -1] + self.match_score;
+                let upleft = if motif[y] == seq[x] {
+                    m_score[x-1][y -1] + self.match_score
                 } else {
-                    let upleft = m_score[x-1][y -1] + self.mismatch_score;
-                }
+                    m_score[x-1][y -1] + self.mismatch_score;
+                };
 
                 if up > upleft && up > left {
                     m_score[x][y] = up;
