@@ -67,9 +67,11 @@ impl Aligner {
                 if up > upleft && up > left {
                     m_score[[x,y]] = up;
                     m_trace[[x,y]] = TraceItem::Up;
+                    m_gap_len[[x,y]] = m_gap_len[[x,y-1]] + 1;
                 } else if left > upleft && left > up {
                     m_score[[x,y]] = left;
                     m_trace[[x,y]] = TraceItem::Left;
+                    m_gap_len[[x,y]] = m_gap_len[[x-1,y]] + 1;
                 } else {
                     m_score[[x,y]] = upleft;
                     m_trace[[x,y]] = TraceItem::Diag;
