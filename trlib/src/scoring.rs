@@ -40,6 +40,37 @@ static IUPAC_CODE_DNA_LOOKUP: Lazy<HashMap<u8, Vec<u8>>> = Lazy::new(|| make_iup
 /// Lookup from IUPAC code to canonical RNA base
 static IUPAC_CODE_RNA_LOOKUP: Lazy<HashMap<u8, Vec<u8>>> = Lazy::new(|| make_iupac_lookup(b'U'));
 
+pub fn iupac_codes_to_bases(is_rna: bool, iupac_str: &[u8]) -> Vec<Vec<u8>> {
+    let lookup = if is_rna {
+        IUPAC_CODE_RNA_LOOKUP.borrow()
+    } else {
+        IUPAC_CODE_DNA_LOOKUP.borrow()
+    };
+
+    let mut res: Vec<Vec<u8>> = Vec::new();
+
+    for c in iupac_str.iter() {
+        let lr = lookup.get(c).expect("sequence char should exist"); // TODO: error
+        if lr.len() == 1 {
+            for motif in res.iter_mut() {
+                motif.push(lr[0]);
+            }
+        } else {
+            let mut res_new: Vec<Vec<u8>> = Vec::new();
+            for motif in res.iter_mut() {
+                for ch in lr.iter() {
+                    let mut mn = motif.clone();
+                    mn.push(*ch);
+                    res_new.push(mn);
+                }
+            }
+            res = res_new;
+        }
+    }
+
+    res.into_iter().collect()
+}
+
 #[derive(Debug, Error)]
 pub enum ScoringMatrixError {
     #[error("error from Parasail: {0}")]
