@@ -150,6 +150,7 @@ pub struct MotifAlignmentInterval {
     end: usize,   // inclusive, 0-based
     pub score: i32,
     pub cigar: SmallVec<[CigarItem; 4]>,
+    pub purity: f64, // Fraction of sequence bases that are exact-matched to a motif base
     motif_idx: usize, // Index of the motif in the motif set
 }
 
@@ -382,6 +383,8 @@ impl MotifSequenceDecomposer {
         let score = tbl_slice[row * tbl_cols + col];
 
         if score >= self.motif_alignment_score_cutoff {
+            let mut n_matches = 0;
+
             // keep alignment of motif to sequence from traceback as well:
             let mut current_op: AlignmentItem = AlignmentItem::Match; // Dummy value to be replaced
             let mut current_op_count: usize = 0;
@@ -398,6 +401,9 @@ impl MotifSequenceDecomposer {
                     if mo.3 != current_op {
                         if current_op_count > 0 {
                             cigar.push(current_op.to_cigar_item(current_op_count));
+                            if current_op == AlignmentItem::Match {
+                                n_matches += current_op_count;
+                            }
                         }
                         current_op = mo.3;
                         current_op_count = 1;
@@ -436,6 +442,7 @@ impl MotifSequenceDecomposer {
                 end: end_col,
                 score,
                 cigar,
+                purity: n_matches as f64 / (end_col - col) as f64,
                 motif_idx,
             });
         }
