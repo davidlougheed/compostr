@@ -150,7 +150,7 @@ pub struct MotifAlignmentInterval {
     end: usize,   // inclusive, 0-based
     pub score: i32,
     pub cigar: SmallVec<[CigarItem; 4]>,
-    pub purity: f64, // Fraction of sequence bases that are exact-matched to a motif base
+    pub purity: f64,  // Fraction of sequence bases that are exact-matched to a motif base
     motif_idx: usize, // Index of the motif in the motif set
 }
 
@@ -158,11 +158,17 @@ fn backtrack_schedule(
     final_schedule: &mut Vec<MotifAlignmentInterval>,
     mut intervals: Vec<MotifAlignmentInterval>,
     m: &[i32],
+    mc: &[usize],
     p: &[usize],
     mut j: usize,
 ) {
     while j > 0 {
-        if intervals[j - 1].score + m[p[j]] >= m[j - 1] {
+        // two subcases in this check
+        //  - score is strictly greater --> we take the interval
+        //  - score is equal --> we take the interval only if the coverage is greater than or equal
+        let sc = intervals[j - 1].score + m[p[j]];
+        if sc > m[j - 1]
+            || (sc == m[j - 1] && (intervals[j - 1].end - intervals[j - 1].start) + mc[p[j]] >= mc[j - 1]) {
             // avoid clone by moving intervals[j - 1]; we're done with everything from [j - 1] forward anyway
             // since we only ever decrement j (via p or via subtracting 1).
             let next_item = {
@@ -200,17 +206,23 @@ fn schedule(intervals: Vec<MotifAlignmentInterval>) -> (Vec<MotifAlignmentInterv
         }
     }
 
-    // construct score table
+    // construct:
+    //  - m:  score table
     let mut m = vec![0; intervals.len() + 1];
+    //  - mc: tiebreaker score table (maximum coverage)
+    let mut mc = vec![0; intervals.len() + 1];
     for i in 1..intervals.len() + 1 {
-        let a = intervals[i - 1].score + m[p[i]];
+        let iv = &intervals[i - 1];
+        let a = iv.score + m[p[i]];
+        let b = iv.end - iv.start;
         m[i] = cmp::max(a, m[i - 1]);
+        mc[i] = cmp::max(b, mc[i - 1]);
     }
 
     let mut final_schedule: Vec<MotifAlignmentInterval> = Vec::new();
     let n_intervals = intervals.len();
 
-    backtrack_schedule(&mut final_schedule, intervals, &m, &p, n_intervals);
+    backtrack_schedule(&mut final_schedule, intervals, &m, &mc, &p, n_intervals);
 
     final_schedule.reverse();
 
