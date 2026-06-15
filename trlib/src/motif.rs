@@ -1,5 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::ops::Index;
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MotifSet {
     motifs: Vec<Vec<u8>>,
 }

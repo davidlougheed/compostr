@@ -1,4 +1,5 @@
 use parasail_rs::prelude::{Aligner, Alignment, Error, Table};
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::cmp;
 use std::sync::Arc;
@@ -9,6 +10,7 @@ use crate::scoring::{ScoringMatrix, ScoringMatrixError};
 /// Structure representing a computed motif decomposition, the result of a call to MotifSequenceDecomposer.decompose().
 /// Contains the decomposition of the sequence into canonical motifs/sequence chunks + a CIGAR alignment for each
 /// decomposed element (TODO) + the final score of the decomposition (i.e., interval-schedule weight) + TODO...
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MotifSequenceDecomposition {
     pub motif_set: Arc<MotifSet>,
     pub decomposition: Vec<DecompositionItem>,
@@ -16,7 +18,7 @@ pub struct MotifSequenceDecomposition {
     pub copies: usize, // Total number of copies of any motif
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum DecompositionItem {
     Alignment(MotifAlignmentInterval),
     Gap(usize),
@@ -144,7 +146,7 @@ pub struct MotifSequenceDecomposer {
 }
 
 /// Representation of a motif alignment to a sequence.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MotifAlignmentInterval {
     start: usize, // inclusive, 0-based
     end: usize,   // inclusive, 0-based
@@ -269,7 +271,7 @@ impl AlignmentItem {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum CigarItem {
     Ins(usize),
     Del(usize),
