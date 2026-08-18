@@ -14,6 +14,9 @@ mod decomposition {
     use serde_json;
     use trlib;
 
+    #[pymodule_export]
+    use trlib::decomposition::CigarItem;
+
     #[pyclass(name = "MotifSequenceDecomposition")]
     pub struct PyMotifSequenceDecomposition {
         inner: trlib::decomposition::MotifSequenceDecomposition,
