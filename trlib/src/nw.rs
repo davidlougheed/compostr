@@ -97,14 +97,19 @@ mod tests {
     use rstest::rstest;
 
      #[rstest]
-     #[case(b"CAG".to_vec(), b"CAG".to_vec())]
-     #[case(b"CAG".to_vec(), b"CCCCAG".to_vec())]
-     #[case(b"CAG".to_vec(), b"CAGCAGCAG".to_vec())]
+     #[case(b"CAG".to_vec(), b"CAG".to_vec(),1,-1,-5,-2)]
+     #[case(b"CAG".to_vec(), b"CCCCAG".to_vec(),1,-1,-5,-2)]
+     #[case(b"CAG".to_vec(), b"CAGCAGCAG".to_vec(),1,-1,-5,-2)]
+     #[case(b"CAG".to_vec(), b"CAAAAAAG".to_vec(),1,-1,0,0)]
      fn test_align(
         #[case] motif: Vec<u8>,
         #[case] seq: Vec<u8>,
+        #[case] match_s: i32,
+        #[case] mismatch_s: i32,
+        #[case] gap_s: i32,
+        #[case] extend_s: i32,
     ) {
-        let aligner = Aligner::new(1,-1,-5,-2);
+        let aligner = Aligner::new(match_s, mismatch_s, gap_s, extend_s);
         let alignment = aligner.align(&motif, &seq);
         print!("{}\n", alignment.m_score.reversed_axes());
         print!("{:?}", alignment.m_trace.reversed_axes());
