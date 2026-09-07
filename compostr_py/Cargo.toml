@@ -1,0 +1,14 @@
+[package]
+name = "compostr_py"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.29", features = ["experimental-inspect", "generate-import-lib"] }
+pyo3-introspection = "0.29"
+serde_json = "1.0"
+trlib = { path = "../trlib", features = ["pyo3"] }
