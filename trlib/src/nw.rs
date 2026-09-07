@@ -1,6 +1,6 @@
 use ndarray::{Array, Array2};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum TraceItem {
     Unset,
     Done,
@@ -14,6 +14,7 @@ pub struct Alignment {
     m_trace: Array2<TraceItem>,
     m_gap_len: Array2<i32>,
 }
+
 
 pub struct Aligner {
     match_score: i32,
@@ -32,21 +33,26 @@ impl Aligner {
         }
     }
 
-    pub fn align_motif_to_seq(self, motif: &[u8], seq: &[u8]) -> Alignment {
+    pub fn align(self, motif: &[u8], seq: &[u8]) -> Alignment {
         let seq_len = seq.len();
         let motif_len = motif.len();
         let mut m_score: Array2<i32> = Array::zeros((seq_len + 1, motif_len + 1));
 
-        let mut m_trace: Array2<TraceItem> = Array::from_elem((seq.len() + 1, motif.len() + 1), TraceItem::Unset);
+        let mut m_trace: Array2<TraceItem> = Array::from_elem((seq_len + 1, motif_len + 1), TraceItem::Unset);
         m_trace[[0, 0]] = TraceItem::Done;
 
         let mut m_gap_len: Array2<i32> = Array::zeros((seq_len + 1, motif_len + 1));
 
-        for i in 1..seq_len {
+        for i in 1..seq_len + motif_len {
             let mut x = i;
             let mut y = 1;
             //iterate the diagonal
-            while y <= motif_len && x > 0 {
+            while y <= motif_len + 1 && x > 0 {
+            if x > seq_len || y > motif_len{
+                x -= 1;
+                y += 1;
+                continue;
+            }
                 //up
                 let up = match m_trace[[x,y-1]] {
                     TraceItem::Up | TraceItem::Left => m_score[[x,y-1]] + self.gap_extend,
@@ -58,7 +64,7 @@ impl Aligner {
                     _ => m_score[[x-1,y]] + self.gap_open
                 };
                 //(mis)match - upleft
-                let upleft = if motif[y] == seq[x] {
+                let upleft = if motif[y-1] == seq[x-1] {
                     m_score[[x-1,y-1]] + self.match_score
                 } else {
                     m_score[[x-1,y-1]] + self.mismatch_score
@@ -89,4 +95,18 @@ impl Aligner {
 mod tests {
     use super::*;
     use rstest::rstest;
+
+     #[rstest]
+     #[case(b"CAG".to_vec(), b"CAG".to_vec())]
+     #[case(b"CAG".to_vec(), b"CCCCAG".to_vec())]
+     #[case(b"CAG".to_vec(), b"CAGCAGCAG".to_vec())]
+     fn test_align(
+        #[case] motif: Vec<u8>,
+        #[case] seq: Vec<u8>,
+    ) {
+        let aligner = Aligner::new(1,-1,-5,-2);
+        let alignment = aligner.align(&motif, &seq);
+        print!("{}\n", alignment.m_score.reversed_axes());
+        print!("{:?}", alignment.m_trace.reversed_axes());
+    }
 }
