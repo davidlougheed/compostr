@@ -6,7 +6,7 @@ mod compostr_py {
     use super::decomposition;
 }
 
-#[pymodule]
+#[pymodule(submodule, name = "decomposition")]
 mod decomposition {
     use pyo3::exceptions::PyException;
     use pyo3::prelude::*;
