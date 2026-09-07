@@ -112,6 +112,6 @@ mod tests {
         let aligner = Aligner::new(match_s, mismatch_s, gap_s, extend_s);
         let alignment = aligner.align(&motif, &seq);
         print!("{}\n", alignment.m_score.reversed_axes());
-        print!("{:?}", alignment.m_trace.reversed_axes());
+        print!("{:?}\n", alignment.m_trace.reversed_axes());
     }
 }
