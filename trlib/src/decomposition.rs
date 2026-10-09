@@ -271,6 +271,7 @@ impl AlignmentItem {
     }
 }
 
+#[cfg_attr(feature = "pyo3", pyo3::pyclass(from_py_object))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum CigarItem {
     Ins(usize),
