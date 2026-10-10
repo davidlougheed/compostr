@@ -407,26 +407,22 @@ impl MotifSequenceDecomposer {
             let mut cigar: SmallVec<[CigarItem; 4]> = SmallVec::new();
 
             while row > 0 {
-                let maxopt = self.sg_traceback_max_opt(motif, seq, row, col, tbl_slice, tbl_cols);
+                // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow:
+                let maxopt = self.sg_traceback_max_opt(motif, seq, row, col, tbl_slice, tbl_cols)?;
 
-                // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow.
-                if let Some(mo) = maxopt {
-                    row = mo.0;
-                    col = mo.1;
-                    if mo.3 != current_op {
-                        if current_op_count > 0 {
-                            cigar.push(current_op.to_cigar_item(current_op_count));
-                            if current_op == AlignmentItem::Match {
-                                n_matches += current_op_count;
-                            }
+                row = maxopt.0;
+                col = maxopt.1;
+                if maxopt.3 != current_op {
+                    if current_op_count > 0 {
+                        cigar.push(current_op.to_cigar_item(current_op_count));
+                        if current_op == AlignmentItem::Match {
+                            n_matches += current_op_count;
                         }
-                        current_op = mo.3;
-                        current_op_count = 1;
-                    } else {
-                        current_op_count += 1;
                     }
+                    current_op = maxopt.3;
+                    current_op_count = 1;
                 } else {
-                    return None; // Something went wrong with score retrieval, this shouldn't happen
+                    current_op_count += 1;
                 }
             }
 

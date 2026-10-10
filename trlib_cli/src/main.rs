@@ -5,7 +5,6 @@ use clap::Parser;
 use noodles_core::Position;
 use noodles_fasta as fasta;
 use serde::Serialize;
-use serde_json;
 use thiserror::Error;
 use trlib::decomposition::{MotifSequenceDecomposer, MotifSequenceDecomposition};
 use trlib::motif::MotifSet;
@@ -53,7 +52,7 @@ fn process_fasta(cli: &Cli) -> Result<Vec<OutputResult>, CompostrCliError> {
     let mut outputs = Vec::new();
 
     for result in reader.records() {
-        let record = result.map_err(|e| FastaIoError(e))?;
+        let record = result.map_err(FastaIoError)?;
         let seq_opt = record.sequence().get(start..);
         if let Some(seq) = seq_opt {
             let res = decomposer.decompose(seq).unwrap();
@@ -75,7 +74,7 @@ fn main() -> Result<(), CompostrCliError> {
 
     let json_res = serde_json::to_string_pretty(&outputs).unwrap();
     let mut writer = File::create(&cli.out).expect("could not open outfile");
-    writer.write(json_res.as_bytes()).expect("could not write to outfile");
+    writer.write_all(json_res.as_bytes()).expect("could not write to outfile");
 
     Ok(())
 }
