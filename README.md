@@ -56,6 +56,15 @@ The first time this is run, the profile will include compilation (and thus won't
 the already-compiled library to get the profile of the actual performance benchmark example.
 
 
+## Benchmarking
+
+To run comparative benchmarking scripts:
+
+- install [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
+- go to the `benchmarking` folder
+- run `uv run benchmarking` to execute the comparative benchmarking scripts
+
+
 ## Copyright Notice
 
 &copy; David Lougheed and Aidon Lebar 2026.
