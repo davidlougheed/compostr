@@ -169,8 +169,8 @@ fn backtrack_schedule(
         //  - score is strictly greater --> we take the interval
         //  - score is equal --> we take the interval only if the coverage is greater than or equal
         let sc = intervals[j - 1].score + m[p[j]];
-        if sc > m[j - 1]
-            || (sc == m[j - 1] && (intervals[j - 1].end - intervals[j - 1].start) + mc[p[j]] >= mc[j - 1]) {
+        if sc > m[j - 1] || (sc == m[j - 1] && (intervals[j - 1].end - intervals[j - 1].start) + mc[p[j]] >= mc[j - 1])
+        {
             // avoid clone by moving intervals[j - 1]; we're done with everything from [j - 1] forward anyway
             // since we only ever decrement j (via p or via subtracting 1).
             let next_item = {
@@ -636,5 +636,16 @@ mod tests {
         let decomposer = MotifSequenceDecomposer::new(motif_set, 4, -4, 5, Some(-1)).unwrap();
         let res = decomposer.decompose(seq.as_slice()).unwrap();
         assert_eq!(res.copies, copies);
+    }
+
+    #[rstest]
+    #[case(
+        b"TTGTTTCTTTTTTGTTTGTTTGTTTT".to_vec(),
+    )]
+    #[case(
+        b"TTGTTTCTTTTTTTTTTGTTTGTTTT".to_vec(),
+    )]
+    fn test_decomposition_4(#[case] seq: Vec<u8>) {
+        // TODO: TTGT motif, homopolymer
     }
 }
