@@ -37,7 +37,10 @@ mod decomposition {
 
         /// Given the original sequence, returns the decomposition of it into sub-slices.
         pub fn sequence_items<'py>(
-            &self, py: Python<'py>, seq: &Bound<'py, PyBytes>, with_unmapped: bool
+            &self,
+            py: Python<'py>,
+            seq: &Bound<'py, PyBytes>,
+            with_unmapped: bool,
         ) -> PyResult<Bound<'py, PyList>> {
             let res = self.inner.sequence_items(seq.as_bytes(), with_unmapped);
             PyList::new(py, res.into_iter().map(|r| PyBytes::new(py, r)))
@@ -46,8 +49,12 @@ mod decomposition {
         // -------------------------------------------------------------------------------------------------------------
 
         fn to_json(&self, pretty: bool) -> PyResult<String> {
-            (if pretty { serde_json::to_string_pretty(&self.inner) } else { serde_json::to_string(&self.inner) })
-                .map_err(|err| PyErr::new::<PyException, _>(err.to_string()))
+            (if pretty {
+                serde_json::to_string_pretty(&self.inner)
+            } else {
+                serde_json::to_string(&self.inner)
+            })
+            .map_err(|err| PyErr::new::<PyException, _>(err.to_string()))
         }
     }
 
@@ -67,23 +74,33 @@ mod decomposition {
             motif_alignment_score_cutoff: Option<i32>,
         ) -> PyResult<Self> {
             Ok(PyMotifSequenceDecomposer {
-                inner:
+                inner: {
                     trlib::decomposition::MotifSequenceDecomposer::new(
                         trlib::motif::MotifSet::new(motifs),
                         match_score,
                         mismatch_score,
                         gap_penalty,
                         motif_alignment_score_cutoff,
-                    ).map_err(|e| PyException::new_err(e.to_string()))?
+                    )
+                    .map_err(|e| PyException::new_err(e.to_string()))?
+                },
             })
         }
 
         pub fn decompose<'py>(
-            &self, py: Python<'py>, seq: &Bound<'py, PyBytes>
+            &self,
+            py: Python<'py>,
+            seq: &Bound<'py, PyBytes>,
         ) -> PyResult<Bound<'py, PyMotifSequenceDecomposition>> {
-            Bound::new(py, PyMotifSequenceDecomposition {
-                inner: self.inner.decompose(seq.as_bytes()).map_err(|e| PyException::new_err(e.to_string()))?
-            })
+            Bound::new(
+                py,
+                PyMotifSequenceDecomposition {
+                    inner: self
+                        .inner
+                        .decompose(seq.as_bytes())
+                        .map_err(|e| PyException::new_err(e.to_string()))?,
+                },
+            )
         }
     }
 }

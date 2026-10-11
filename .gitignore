@@ -3,3 +3,6 @@
 # profiling
 flamegraph.svg
 profile.json
+
+# random outputs
+test*.json

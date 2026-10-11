@@ -7,6 +7,27 @@ genotyping ([STRkit](https://github.com/davidlougheed/strkit/)) and, eventually,
 **Note:** This library is under active development and not ready for use yet.
 
 
+## Installation
+
+TODO
+
+To install the crate for use in a Rust program or library, use the following command:
+
+```bash
+cargo add --git https://github.com/davidlougheed/compostr.git
+```
+
+
+## Usage
+
+TODO
+
+### Rust API
+
+* Rust API: [`docs/rust_api.md`](docs/rust_api.md)
+* Python API: [`docs/python_api.md`](docs/python_api.md)
+
+
 ## Motivation
 
 Tandem repeats (TRs) are sequences of DNA composed of a motif (or possibly a set of different motifs) repeated several

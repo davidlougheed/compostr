@@ -169,8 +169,8 @@ fn backtrack_schedule(
         //  - score is strictly greater --> we take the interval
         //  - score is equal --> we take the interval only if the coverage is greater than or equal
         let sc = intervals[j - 1].score + m[p[j]];
-        if sc > m[j - 1]
-            || (sc == m[j - 1] && (intervals[j - 1].end - intervals[j - 1].start) + mc[p[j]] >= mc[j - 1]) {
+        if sc > m[j - 1] || (sc == m[j - 1] && (intervals[j - 1].end - intervals[j - 1].start) + mc[p[j]] >= mc[j - 1])
+        {
             // avoid clone by moving intervals[j - 1]; we're done with everything from [j - 1] forward anyway
             // since we only ever decrement j (via p or via subtracting 1).
             let next_item = {
@@ -407,26 +407,22 @@ impl MotifSequenceDecomposer {
             let mut cigar: SmallVec<[CigarItem; 4]> = SmallVec::new();
 
             while row > 0 {
-                let maxopt = self.sg_traceback_max_opt(motif, seq, row, col, tbl_slice, tbl_cols);
+                // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow:
+                let maxopt = self.sg_traceback_max_opt(motif, seq, row, col, tbl_slice, tbl_cols)?;
 
-                // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow.
-                if let Some(mo) = maxopt {
-                    row = mo.0;
-                    col = mo.1;
-                    if mo.3 != current_op {
-                        if current_op_count > 0 {
-                            cigar.push(current_op.to_cigar_item(current_op_count));
-                            if current_op == AlignmentItem::Match {
-                                n_matches += current_op_count;
-                            }
+                row = maxopt.0;
+                col = maxopt.1;
+                if maxopt.3 != current_op {
+                    if current_op_count > 0 {
+                        cigar.push(current_op.to_cigar_item(current_op_count));
+                        if current_op == AlignmentItem::Match {
+                            n_matches += current_op_count;
                         }
-                        current_op = mo.3;
-                        current_op_count = 1;
-                    } else {
-                        current_op_count += 1;
                     }
+                    current_op = maxopt.3;
+                    current_op_count = 1;
                 } else {
-                    return None; // Something went wrong with score retrieval, this shouldn't happen
+                    current_op_count += 1;
                 }
             }
 
@@ -640,5 +636,16 @@ mod tests {
         let decomposer = MotifSequenceDecomposer::new(motif_set, 4, -4, 5, Some(-1)).unwrap();
         let res = decomposer.decompose(seq.as_slice()).unwrap();
         assert_eq!(res.copies, copies);
+    }
+
+    #[rstest]
+    #[case(
+        b"TTGTTTCTTTTTTGTTTGTTTGTTTT".to_vec(),
+    )]
+    #[case(
+        b"TTGTTTCTTTTTTTTTTGTTTGTTTT".to_vec(),
+    )]
+    fn test_decomposition_4(#[case] seq: Vec<u8>) {
+        // TODO: TTGT motif, homopolymer
     }
 }
