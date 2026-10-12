@@ -15,7 +15,6 @@ pub struct Alignment {
     m_gap_len: Array2<i32>,
 }
 
-
 pub struct Aligner {
     match_score: i32,
     mismatch_score: i32,
@@ -48,46 +47,46 @@ impl Aligner {
             let mut y = 1;
             //iterate the diagonal
             while y <= motif_len + 1 && x > 0 {
-            if x > seq_len || y > motif_len{
-                x -= 1;
-                y += 1;
-                continue;
-            }
+                if x > seq_len || y > motif_len {
+                    x -= 1;
+                    y += 1;
+                    continue;
+                }
                 //up
-                let up = match m_trace[[x,y-1]] {
-                    TraceItem::Up | TraceItem::Left => m_score[[x,y-1]] + self.gap_extend,
-                    _ => m_score[[x,y-1]] + self.gap_open
+                let up = match m_trace[[x, y - 1]] {
+                    TraceItem::Up | TraceItem::Left => m_score[[x, y - 1]] + self.gap_extend,
+                    _ => m_score[[x, y - 1]] + self.gap_open,
                 };
                 //left
-                let left = match m_trace[[x-1,y]] {
-                    TraceItem::Up | TraceItem::Left => m_score[[x-1,y]] + self.gap_extend,
-                    _ => m_score[[x-1,y]] + self.gap_open
+                let left = match m_trace[[x - 1, y]] {
+                    TraceItem::Up | TraceItem::Left => m_score[[x - 1, y]] + self.gap_extend,
+                    _ => m_score[[x - 1, y]] + self.gap_open,
                 };
                 //(mis)match - upleft
-                let upleft = if motif[y-1] == seq[x-1] {
-                    m_score[[x-1,y-1]] + self.match_score
+                let upleft = if motif[y - 1] == seq[x - 1] {
+                    m_score[[x - 1, y - 1]] + self.match_score
                 } else {
-                    m_score[[x-1,y-1]] + self.mismatch_score
+                    m_score[[x - 1, y - 1]] + self.mismatch_score
                 };
 
                 if up > upleft && up > left {
-                    m_score[[x,y]] = up;
-                    m_trace[[x,y]] = TraceItem::Up;
-                    m_gap_len[[x,y]] = m_gap_len[[x,y-1]] + 1;
+                    m_score[[x, y]] = up;
+                    m_trace[[x, y]] = TraceItem::Up;
+                    m_gap_len[[x, y]] = m_gap_len[[x, y - 1]] + 1;
                 } else if left > upleft && left > up {
-                    m_score[[x,y]] = left;
-                    m_trace[[x,y]] = TraceItem::Left;
-                    m_gap_len[[x,y]] = m_gap_len[[x-1,y]] + 1;
+                    m_score[[x, y]] = left;
+                    m_trace[[x, y]] = TraceItem::Left;
+                    m_gap_len[[x, y]] = m_gap_len[[x - 1, y]] + 1;
                 } else {
-                    m_score[[x,y]] = upleft;
-                    m_trace[[x,y]] = TraceItem::Diag;
+                    m_score[[x, y]] = upleft;
+                    m_trace[[x, y]] = TraceItem::Diag;
                 }
                 x -= 1;
                 y += 1;
             }
         }
 
-        Alignment { m_score, m_trace, m_gap_len}
+        Alignment { m_score, m_trace, m_gap_len }
     }
 }
 
@@ -96,12 +95,12 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
-     #[rstest]
-     #[case(b"CAG".to_vec(), b"CAG".to_vec(),1,-1,-5,-2)]
-     #[case(b"CAG".to_vec(), b"CCCCAG".to_vec(),1,-1,-5,-2)]
-     #[case(b"CAG".to_vec(), b"CAGCAGCAG".to_vec(),1,-1,-5,-2)]
-     #[case(b"CAG".to_vec(), b"CAAAAAAG".to_vec(),1,-1,0,0)]
-     fn test_align(
+    #[rstest]
+    #[case(b"CAG".to_vec(), b"CAG".to_vec(),1,-1,-5,-2)]
+    #[case(b"CAG".to_vec(), b"CCCCAG".to_vec(),1,-1,-5,-2)]
+    #[case(b"CAG".to_vec(), b"CAGCAGCAG".to_vec(),1,-1,-5,-2)]
+    #[case(b"CAG".to_vec(), b"CAAAAAAG".to_vec(),1,-1,0,0)]
+    fn test_align(
         #[case] motif: Vec<u8>,
         #[case] seq: Vec<u8>,
         #[case] match_s: i32,
