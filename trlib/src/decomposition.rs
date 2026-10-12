@@ -343,7 +343,7 @@ impl MotifSequenceDecomposer {
             // TODO: this doesn't support affine gap properly
             let left = tbl_slice[row * tbl_cols + (col - 1)];
             let diag = tbl_slice[(row - 1) * tbl_cols + (col - 1)];
-            let (sc, ait) = if motif[row] == seq[col] {
+            let (sc, ait) = if motif[row - 1] == seq[col - 1] {
                 (self.match_score, AlignmentItem::Match)
             } else {
                 (self.mismatch_score, AlignmentItem::Mismatch)
