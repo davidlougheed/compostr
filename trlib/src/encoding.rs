@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::decomposition::MotifSequenceDecomposition;
 
-#[derive(Error, Debug)]
+#[derive(Error, PartialEq, Debug)]
 pub enum EncodeError {
     #[error("alphabet exhausted")]
     AlphabetExhausted,
@@ -13,6 +13,7 @@ pub enum EncodeError {
     MutexLockError,
 }
 
+#[derive(Debug)]
 pub struct EncodeAlphabet {
     alphabet: Vec<char>,
     ptr: usize,
@@ -96,5 +97,16 @@ mod tests {
 
         let res2 = encoder.encode(&seq_u8).expect("should work again");
         assert_eq!(res.0, res2.0);
+    }
+
+    #[rstest]
+    #[case(vec!["CAG", "CAG", "CCG", "CGG"], "AB")]
+    fn test_encoding_exhausted(#[case] seq: Vec<&str>, #[case] alphabet: &str) {
+        let mut encoder = Encoder {
+            alphabet: EncodeAlphabetParam::NewAlphabet(alphabet.chars().collect()),
+        };
+        let seq_u8: Vec<&[u8]> = seq.into_iter().map(|s| s.as_bytes()).collect();
+        let err = encoder.encode(&seq_u8).expect_err("should be exhausted");
+        assert_eq!(err, EncodeError::AlphabetExhausted)
     }
 }
