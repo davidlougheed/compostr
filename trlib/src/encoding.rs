@@ -45,10 +45,7 @@ pub struct Encoder {
 }
 
 impl Encoder {
-    pub fn encode(
-        &mut self,
-        motifs: &[&[u8]],
-    ) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet>>), EncodeError> {
+    pub fn encode(&mut self, motifs: &[&[u8]]) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet>>), EncodeError> {
         let mut res = Vec::with_capacity(motifs.len());
         let a = match &self.alphabet {
             EncodeAlphabetParam::NewAlphabet(a) => Arc::new(Mutex::new(EncodeAlphabet {
