@@ -26,7 +26,7 @@ impl EncodeAlphabet {
             Ok(val)
         } else if self.ptr < self.alphabet.len() {
             let val = self.alphabet[self.ptr];
-            self.lookup.insert(motif.iter().map(|&x| x).collect(), val);
+            self.lookup.insert(motif.iter().copied().collect(), val);
             self.ptr += 1;
             Ok(val)
         } else {
