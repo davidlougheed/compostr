@@ -13,19 +13,20 @@ pub enum EncodeError {
     MutexLockError,
 }
 
-pub struct EncodeAlphabet<'a> {
-    alphabet: &'a [char],
+pub struct EncodeAlphabet {
+    alphabet: Vec<char>,
     ptr: usize,
-    lookup: RapidHashMap<&'a [u8], char>,
+    // could maybe make keys slices if we could figure out lifetimes
+    lookup: RapidHashMap<Vec<u8>, char>,
 }
 
-impl<'a> EncodeAlphabet<'a> {
-    pub fn encode_motif(&mut self, motif: &'a [u8]) -> Result<char, EncodeError> {
+impl EncodeAlphabet {
+    pub fn encode_motif(&mut self, motif: &[u8]) -> Result<char, EncodeError> {
         if let Some(&val) = self.lookup.get(motif) {
             Ok(val)
         } else if self.ptr < self.alphabet.len() {
             let val = self.alphabet[self.ptr];
-            self.lookup.insert(motif, val);
+            self.lookup.insert(motif.iter().map(|&x| x).collect(), val);
             self.ptr += 1;
             Ok(val)
         } else {
@@ -34,24 +35,24 @@ impl<'a> EncodeAlphabet<'a> {
     }
 }
 
-pub enum EncodeAlphabetParam<'a> {
-    NewAlphabet(&'a [char]),
-    ExistingAlphabet(Arc<Mutex<EncodeAlphabet<'a>>>),
+pub enum EncodeAlphabetParam {
+    NewAlphabet(Vec<char>),
+    ExistingAlphabet(Arc<Mutex<EncodeAlphabet>>),
 }
 
-pub struct Encoder<'a> {
-    alphabet: EncodeAlphabetParam<'a>,
+pub struct Encoder {
+    alphabet: EncodeAlphabetParam,
 }
 
-impl<'a> Encoder<'a> {
+impl Encoder {
     pub fn encode(
-        &'a mut self,
-        motifs: &[&'a [u8]],
-    ) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet<'a>>>), EncodeError> {
+        &mut self,
+        motifs: &[&[u8]],
+    ) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet>>), EncodeError> {
         let mut res = Vec::with_capacity(motifs.len());
         let a = match &self.alphabet {
             EncodeAlphabetParam::NewAlphabet(a) => Arc::new(Mutex::new(EncodeAlphabet {
-                alphabet: a,
+                alphabet: a.clone(),
                 ptr: 0,
                 lookup: RapidHashMap::new(),
             })),
@@ -69,11 +70,11 @@ impl<'a> Encoder<'a> {
     }
 
     pub fn encode_decomposition(
-        &'a mut self,
-        seq: &'a [u8],
-        d: &'a MotifSequenceDecomposition,
+        &mut self,
+        seq: &[u8],
+        d: &MotifSequenceDecomposition,
         with_interruptions: bool,
-    ) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet<'a>>>), EncodeError> {
+    ) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet>>), EncodeError> {
         let si = d.sequence_items(seq, with_interruptions);
         self.encode(&si)
     }
@@ -90,10 +91,13 @@ mod tests {
     fn test_encoding(#[case] seq: Vec<&str>, #[case] alphabet: &str, #[case] end_res: &str) {
         let alphabet_chars: Vec<char> = alphabet.chars().collect();
         let mut encoder = Encoder {
-            alphabet: EncodeAlphabetParam::NewAlphabet(&alphabet_chars),
+            alphabet: EncodeAlphabetParam::NewAlphabet(alphabet_chars),
         };
         let seq_u8: Vec<&[u8]> = seq.into_iter().map(|s| s.as_bytes()).collect();
         let res = encoder.encode(&seq_u8).expect("should work");
         assert_eq!(res.0, end_res.chars().collect::<Vec<char>>());
+
+        let res2 = encoder.encode(&seq_u8).expect("should work again");
+        assert_eq!(res.0, res2.0);
     }
 }
