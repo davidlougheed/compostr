@@ -109,4 +109,30 @@ mod tests {
         let err = encoder.encode(&seq_u8).expect_err("should be exhausted");
         assert_eq!(err, EncodeError::AlphabetExhausted)
     }
+
+    #[rstest]
+    #[case(vec!["CAG", "CAG", "CCG", "CCG"], "AB", "AABB", vec!["CAG", "CCG", "CCG", "CCG"], "ABBB")]
+    fn test_encoding_reuse(
+        #[case] seq: Vec<&str>,
+        #[case] alphabet: &str,
+        #[case] end_res_1: &str,
+        #[case] seq_2: Vec<&str>,
+        #[case] end_res_2: &str,
+    ) {
+        let mut encoder = Encoder {
+            alphabet: EncodeAlphabetParam::NewAlphabet(alphabet.chars().collect()),
+        };
+        let seq_u8: Vec<&[u8]> = seq.into_iter().map(|s| s.as_bytes()).collect();
+
+        let res1 = encoder.encode(&seq_u8).expect("res1 should work");
+        assert_eq!(res1.0, end_res_1.chars().collect::<Vec<char>>());
+
+        let mut encoder_2 = Encoder {
+            alphabet: EncodeAlphabetParam::ExistingAlphabet(res1.1),
+        };
+
+        let seq_2_u8: Vec<&[u8]> = seq_2.into_iter().map(|s| s.as_bytes()).collect();
+        let res2 = encoder_2.encode(&seq_2_u8).expect("res2 should work");
+        assert_eq!(res2.0, end_res_2.chars().collect::<Vec<char>>());
+    }
 }
