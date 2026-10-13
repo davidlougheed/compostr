@@ -67,14 +67,15 @@ fn process_fasta(cli: &Cli) -> Result<Vec<OutputResult>, CompostrCliError> {
     Ok(outputs)
 }
 
-
 fn main() -> Result<(), CompostrCliError> {
     let cli = Cli::parse();
     let outputs = process_fasta(&cli)?;
 
     let json_res = serde_json::to_string_pretty(&outputs).unwrap();
     let mut writer = File::create(&cli.out).expect("could not open outfile");
-    writer.write_all(json_res.as_bytes()).expect("could not write to outfile");
+    writer
+        .write_all(json_res.as_bytes())
+        .expect("could not write to outfile");
 
     Ok(())
 }
