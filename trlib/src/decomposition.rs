@@ -1,4 +1,5 @@
 use parasail_rs::prelude::{Aligner, Alignment, Error, Table};
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::cmp;
 use std::sync::Arc;
@@ -9,6 +10,7 @@ use crate::scoring::{ScoringMatrix, ScoringMatrixError};
 /// Structure representing a computed motif decomposition, the result of a call to MotifSequenceDecomposer.decompose().
 /// Contains the decomposition of the sequence into canonical motifs/sequence chunks + a CIGAR alignment for each
 /// decomposed element (TODO) + the final score of the decomposition (i.e., interval-schedule weight) + TODO...
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MotifSequenceDecomposition {
     pub motif_set: Arc<MotifSet>,
     pub decomposition: Vec<DecompositionItem>,
@@ -16,6 +18,7 @@ pub struct MotifSequenceDecomposition {
     pub copies: usize, // Total number of copies of any motif
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub enum DecompositionItem {
     Alignment(MotifAlignmentInterval),
     Gap(usize),
@@ -143,12 +146,13 @@ pub struct MotifSequenceDecomposer {
 }
 
 /// Representation of a motif alignment to a sequence.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MotifAlignmentInterval {
     start: usize, // inclusive, 0-based
     end: usize,   // inclusive, 0-based
     pub score: i32,
     pub cigar: SmallVec<[CigarItem; 4]>,
+    pub purity: f64,  // Fraction of sequence bases that are exact-matched to a motif base
     motif_idx: usize, // Index of the motif in the motif set
 }
 
@@ -156,11 +160,17 @@ fn backtrack_schedule(
     final_schedule: &mut Vec<MotifAlignmentInterval>,
     mut intervals: Vec<MotifAlignmentInterval>,
     m: &[i32],
+    mc: &[usize],
     p: &[usize],
     mut j: usize,
 ) {
     while j > 0 {
-        if intervals[j - 1].score + m[p[j]] >= m[j - 1] {
+        // two subcases in this check
+        //  - score is strictly greater --> we take the interval
+        //  - score is equal --> we take the interval only if the coverage is greater than or equal
+        let sc = intervals[j - 1].score + m[p[j]];
+        if sc > m[j - 1] || (sc == m[j - 1] && (intervals[j - 1].end - intervals[j - 1].start) + mc[p[j]] >= mc[j - 1])
+        {
             // avoid clone by moving intervals[j - 1]; we're done with everything from [j - 1] forward anyway
             // since we only ever decrement j (via p or via subtracting 1).
             let next_item = {
@@ -184,27 +194,37 @@ fn schedule(intervals: Vec<MotifAlignmentInterval>) -> (Vec<MotifAlignmentInterv
     let mut p = vec![0; intervals.len() + 1];
     for i in 1..intervals.len() + 1 {
         let mut n = i - 1;
-        while n > 0 {
+        loop {
             if intervals[n].end < intervals[i - 1].start {
                 // interval coordinates are inclusive, so use '<'
                 p[i] = n + 1;
                 break;
             }
-            n -= 1;
+            if n > 0 {
+                n -= 1;
+            } else {
+                break;
+            }
         }
     }
 
-    // construct score table
+    // construct:
+    //  - m:  score table
     let mut m = vec![0; intervals.len() + 1];
+    //  - mc: tiebreaker score table (maximum coverage)
+    let mut mc = vec![0; intervals.len() + 1];
     for i in 1..intervals.len() + 1 {
-        let a = intervals[i - 1].score + m[p[i]];
+        let iv = &intervals[i - 1];
+        let a = iv.score + m[p[i]];
+        let b = iv.end - iv.start;
         m[i] = cmp::max(a, m[i - 1]);
+        mc[i] = cmp::max(b, mc[i - 1]);
     }
 
     let mut final_schedule: Vec<MotifAlignmentInterval> = Vec::new();
     let n_intervals = intervals.len();
 
-    backtrack_schedule(&mut final_schedule, intervals, &m, &p, n_intervals);
+    backtrack_schedule(&mut final_schedule, intervals, &m, &mc, &p, n_intervals);
 
     final_schedule.reverse();
 
@@ -251,7 +271,8 @@ impl AlignmentItem {
     }
 }
 
-#[derive(Clone, Debug)]
+#[cfg_attr(feature = "pyo3", pyo3::pyclass(from_py_object))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum CigarItem {
     Ins(usize),
     Del(usize),
@@ -340,7 +361,7 @@ impl MotifSequenceDecomposer {
         let up = tbl_slice[(row - 1) * tbl_cols + col];
         let del_opt = (row - 1, col, up - self.gap_penalty, AlignmentItem::Del);
 
-        let maxopt = match (ins_opt, match_opt) {
+        match (ins_opt, match_opt) {
             (Some(i), Some(m)) => {
                 Some(if i.2 > m.2 && i.2 >= del_opt.2 {
                     i
@@ -355,9 +376,7 @@ impl MotifSequenceDecomposer {
             (None, Some(m)) => Some(if m.2 >= del_opt.2 { m } else { del_opt }),
             // base case (should never happen)
             (None, None) => None,
-        };
-
-        maxopt
+        }
     }
 
     /// Given a motif-sequence alignment table and an ending row/col for an alignment, trace back the alignment to return
@@ -379,6 +398,8 @@ impl MotifSequenceDecomposer {
         let score = tbl_slice[row * tbl_cols + col];
 
         if score >= self.motif_alignment_score_cutoff {
+            let mut n_matches = 0;
+
             // keep alignment of motif to sequence from traceback as well:
             let mut current_op: AlignmentItem = AlignmentItem::Match; // Dummy value to be replaced
             let mut current_op_count: usize = 0;
@@ -386,23 +407,22 @@ impl MotifSequenceDecomposer {
             let mut cigar: SmallVec<[CigarItem; 4]> = SmallVec::new();
 
             while row > 0 {
-                let maxopt = self.sg_traceback_max_opt(motif, seq, row, col, tbl_slice, tbl_cols);
+                // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow:
+                let maxopt = self.sg_traceback_max_opt(motif, seq, row, col, tbl_slice, tbl_cols)?;
 
-                // maxopt shouldn't ever actually be None, otherwise something went wrong with score retrieval somehow.
-                if let Some(mo) = maxopt {
-                    row = mo.0;
-                    col = mo.1;
-                    if mo.3 != current_op {
-                        if current_op_count > 0 {
-                            cigar.push(current_op.to_cigar_item(current_op_count));
+                row = maxopt.0;
+                col = maxopt.1;
+                if maxopt.3 != current_op {
+                    if current_op_count > 0 {
+                        cigar.push(current_op.to_cigar_item(current_op_count));
+                        if current_op == AlignmentItem::Match {
+                            n_matches += current_op_count;
                         }
-                        current_op = mo.3;
-                        current_op_count = 1;
-                    } else {
-                        current_op_count += 1;
                     }
+                    current_op = maxopt.3;
+                    current_op_count = 1;
                 } else {
-                    return None; // Something went wrong with score retrieval, this shouldn't happen
+                    current_op_count += 1;
                 }
             }
 
@@ -433,6 +453,7 @@ impl MotifSequenceDecomposer {
                 end: end_col,
                 score,
                 cigar,
+                purity: n_matches as f64 / (end_col - col) as f64,
                 motif_idx,
             });
         }
@@ -491,6 +512,16 @@ impl MotifSequenceDecomposer {
     /// Main functionality for MotifSequenceDecomposer - given a sequence, decomposes it into motifs using the motif
     /// set and alignment parameters that were specified for the decomposer instance.
     pub fn decompose(&self, seq: &[u8]) -> Result<MotifSequenceDecomposition, Error> {
+        // early return in blank case
+        if seq == b"" {
+            return Ok(MotifSequenceDecomposition {
+                motif_set: self.motif_set.clone(),
+                decomposition: Vec::new(),
+                score: 0,
+                copies: 0,
+            });
+        }
+
         // rough algorithm outline, 3 parts:
 
         //  1: align all motifs (ends-free) to sequence to get alignment score matrix
@@ -525,6 +556,7 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
+    #[case(b"".to_vec(), vec![], "\n\n", 0)]
     #[case(b"CAG".to_vec(), vec!["CAG"], "CAG\n|||\nCAG", 1)]
     #[case(b"CAAG".to_vec(), vec!["CAAG"], "CA-G\n|| |\nCAAG", 1)]
     #[case(
@@ -592,8 +624,28 @@ mod tests {
     fn test_decomposition_2(#[case] seq: Vec<u8>, #[case] expected_align_str: &str, #[case] expected_copies: usize) {
         let motif_set = MotifSet::new_from_strs(&vec!["GATGATGGGAGTGTGCGCAGTGTAAG"]);
         let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, Some(-2)).unwrap();
-        let res = decomposer.decompose(seq.as_slice()).unwrap();
+        let res = decomposer.decompose(&seq).unwrap();
         assert_eq!(res.alignment_string(&seq), expected_align_str);
         assert_eq!(res.copies, expected_copies);
+    }
+
+    #[rstest]
+    #[case(b"TTTTTATTTTTATTTTTTATTTTTCTT".to_vec(), 4)]
+    fn test_decomposition_3(#[case] seq: Vec<u8>, #[case] copies: usize) {
+        let motif_set = MotifSet::new_from_strs(&vec!["TTTTTAT"]);
+        let decomposer = MotifSequenceDecomposer::new(motif_set, 4, -4, 5, Some(-1)).unwrap();
+        let res = decomposer.decompose(seq.as_slice()).unwrap();
+        assert_eq!(res.copies, copies);
+    }
+
+    #[rstest]
+    #[case(
+        b"TTGTTTCTTTTTTGTTTGTTTGTTTT".to_vec(),
+    )]
+    #[case(
+        b"TTGTTTCTTTTTTTTTTGTTTGTTTT".to_vec(),
+    )]
+    fn test_decomposition_4(#[case] seq: Vec<u8>) {
+        // TODO: TTGT motif, homopolymer
     }
 }

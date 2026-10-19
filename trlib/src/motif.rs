@@ -1,5 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::ops::Index;
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MotifSet {
     motifs: Vec<Vec<u8>>,
 }
@@ -19,6 +21,10 @@ impl MotifSet {
 
     pub fn len(&self) -> usize {
         self.motifs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.motifs.is_empty()
     }
 }
 

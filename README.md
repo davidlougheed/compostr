@@ -1,7 +1,31 @@
-# trlib
+# compostr
 
-`trlib` is a tandem repeat motif decomposition and consensus sequence calculation library, primarily for use by
-[STRkit](https://github.com/davidlougheed/strkit/) and `telokit`.
+`compostr` (<ins>compos</ins>ition analysis of <ins>t</ins>andem <ins>r</ins>epeats) is a
+tandem repeat motif decomposition and consensus sequence calculation library, primarily for use in tandem repeat
+genotyping ([STRkit](https://github.com/davidlougheed/strkit/)) and, eventually, for telomere analysis.
+
+**Note:** This library is under active development and not ready for use yet.
+
+
+## Installation
+
+TODO
+
+To install the crate for use in a Rust program or library, use the following command:
+
+```bash
+cargo add --git https://github.com/davidlougheed/compostr.git
+```
+
+
+## Usage
+
+TODO
+
+### Rust API
+
+* Rust API: [`docs/rust_api.md`](docs/rust_api.md)
+* Python API: [`docs/python_api.md`](docs/python_api.md)
 
 
 ## Motivation
@@ -26,13 +50,13 @@ As an example of how both length and motif composition can matter, consider
 [Spinocerebellar ataxia type 37](https://strchive.org/loci/sca37_dab1/), where pathogenicity comes from an alternate
 pentanucleotide motif stretch `(GAAAT)n`, rather than an expansion of the "canonical" motif `(AAAAT)n`.
 
-**Therefore**, it is important to be able to decompose a TR sequence into the motifs that compose it in order to fully
+Therefore, it is important to be able to decompose a TR sequence into the motifs that compose it in order to fully
 characterize a TR and its relationship to phenotype.
 
 Doing this is complicated by sequencing errors (string substitutions/insertions/deletions) and biology being messy as
 usual, meaning we may get imperfect or erroneous motif copies.
 
-**The goal here** is to build a library which can perform this motif decomposition accurately, quickly, and in a manner
+The goal is to build a library which can perform this motif decomposition accurately, quickly, and in a manner
 which allows for non-canonical motifs or even non-repeat DNA inserted into the sequence.
 
 

@@ -29,8 +29,12 @@ fn rev_from_alphabet(alphabet: &[u8]) -> HashMap<u8, usize> {
     HashMap::from_iter(alphabet.iter().enumerate().map(|(i, &b)| (b, i)))
 }
 
+const BASIC_DNA_ALPHABET: &[u8; 4] = b"ACGT";
+
 const IUPAC_DNA_ALPHABET: &[u8; 15] = b"ACGTRYSWKMBDHVN";
 static IUPAC_DNA_ALPHABET_REVERSE: Lazy<HashMap<u8, usize>> = Lazy::new(|| rev_from_alphabet(IUPAC_DNA_ALPHABET));
+
+const BASIC_RNA_ALPHABET: &[u8; 4] = b"ACGU";
 
 const IUPAC_RNA_ALPHABET: &[u8; 15] = b"ACGURYSWKMBDHVN";
 static IUPAC_RNA_ALPHABET_REVERSE: Lazy<HashMap<u8, usize>> = Lazy::new(|| rev_from_alphabet(IUPAC_RNA_ALPHABET));
@@ -39,6 +43,37 @@ static IUPAC_RNA_ALPHABET_REVERSE: Lazy<HashMap<u8, usize>> = Lazy::new(|| rev_f
 static IUPAC_CODE_DNA_LOOKUP: Lazy<HashMap<u8, Vec<u8>>> = Lazy::new(|| make_iupac_lookup(b'T'));
 /// Lookup from IUPAC code to canonical RNA base
 static IUPAC_CODE_RNA_LOOKUP: Lazy<HashMap<u8, Vec<u8>>> = Lazy::new(|| make_iupac_lookup(b'U'));
+
+pub fn iupac_codes_to_bases(is_rna: bool, iupac_str: &[u8]) -> Vec<Vec<u8>> {
+    let lookup = if is_rna {
+        IUPAC_CODE_RNA_LOOKUP.borrow()
+    } else {
+        IUPAC_CODE_DNA_LOOKUP.borrow()
+    };
+
+    let mut res: Vec<Vec<u8>> = Vec::new();
+
+    for c in iupac_str.iter() {
+        let lr = lookup.get(c).expect("sequence char should exist"); // TODO: error
+        if lr.len() == 1 {
+            for motif in res.iter_mut() {
+                motif.push(lr[0]);
+            }
+        } else {
+            let mut res_new: Vec<Vec<u8>> = Vec::new();
+            for motif in res.iter_mut() {
+                for ch in lr.iter() {
+                    let mut mn = motif.clone();
+                    mn.push(*ch);
+                    res_new.push(mn);
+                }
+            }
+            res = res_new;
+        }
+    }
+
+    res.into_iter().collect()
+}
 
 #[derive(Debug, Error)]
 pub enum ScoringMatrixError {
@@ -51,26 +86,36 @@ pub struct ScoringMatrix {
     pub matrix: Matrix,
 }
 
-fn make_parasail_matrix(is_rna: bool, match_score: i32, mismatch_score: i32) -> Result<Matrix, PError> {
-    let alphabet = if is_rna { IUPAC_RNA_ALPHABET } else { IUPAC_DNA_ALPHABET };
+fn make_parasail_matrix(is_rna: bool, is_iupac: bool, match_score: i32, mismatch_score: i32) -> Result<Matrix, PError> {
+    let alphabet = if is_rna && is_iupac {
+        IUPAC_RNA_ALPHABET.as_slice()
+    } else if is_rna && !is_iupac {
+        BASIC_RNA_ALPHABET.as_slice()
+    } else if !is_rna && is_iupac {
+        IUPAC_DNA_ALPHABET.as_slice()
+    } else {
+        BASIC_DNA_ALPHABET.as_slice()
+    };
     let mut matrix = Matrix::create(alphabet, match_score, mismatch_score)?;
 
-    let code_lookup = if is_rna {
-        IUPAC_CODE_RNA_LOOKUP.borrow()
-    } else {
-        IUPAC_CODE_DNA_LOOKUP.borrow()
-    };
+    if is_iupac {
+        let code_lookup = if is_rna {
+            IUPAC_CODE_RNA_LOOKUP.borrow()
+        } else {
+            IUPAC_CODE_DNA_LOOKUP.borrow()
+        };
 
-    let rev = if is_rna {
-        IUPAC_RNA_ALPHABET_REVERSE.borrow()
-    } else {
-        IUPAC_DNA_ALPHABET_REVERSE.borrow()
-    };
+        let rev = if is_rna {
+            IUPAC_RNA_ALPHABET_REVERSE.borrow()
+        } else {
+            IUPAC_DNA_ALPHABET_REVERSE.borrow()
+        };
 
-    for (code, code_matches) in code_lookup.iter() {
-        for cm in code_matches.iter() {
-            matrix.set_value(rev[code] as i32, rev[cm] as i32, match_score)?;
-            matrix.set_value(rev[cm] as i32, rev[code] as i32, match_score)?;
+        for (code, code_matches) in code_lookup.iter() {
+            for cm in code_matches.iter() {
+                matrix.set_value(rev[code] as i32, rev[cm] as i32, match_score)?;
+                matrix.set_value(rev[cm] as i32, rev[code] as i32, match_score)?;
+            }
         }
     }
 
@@ -78,17 +123,39 @@ fn make_parasail_matrix(is_rna: bool, match_score: i32, mismatch_score: i32) -> 
 }
 
 impl ScoringMatrix {
+    pub fn new_basic_dna(match_score: i32, mismatch_score: i32) -> Result<Self, ScoringMatrixError> {
+        Ok(ScoringMatrix {
+            matrix: make_parasail_matrix(false, false, match_score, mismatch_score)
+                .map_err(ScoringMatrixError::ParasailError)?,
+        })
+    }
+
+    pub fn new_basic_rna(match_score: i32, mismatch_score: i32) -> Result<Self, ScoringMatrixError> {
+        Ok(ScoringMatrix {
+            matrix: make_parasail_matrix(true, false, match_score, mismatch_score)
+                .map_err(ScoringMatrixError::ParasailError)?,
+        })
+    }
+
     pub fn new_iupac_dna(match_score: i32, mismatch_score: i32) -> Result<Self, ScoringMatrixError> {
         Ok(ScoringMatrix {
-            matrix: make_parasail_matrix(false, match_score, mismatch_score)
+            matrix: make_parasail_matrix(false, true, match_score, mismatch_score)
                 .map_err(ScoringMatrixError::ParasailError)?,
         })
     }
 
     pub fn new_iupac_rna(match_score: i32, mismatch_score: i32) -> Result<Self, ScoringMatrixError> {
         Ok(ScoringMatrix {
-            matrix: make_parasail_matrix(true, match_score, mismatch_score)
+            matrix: make_parasail_matrix(true, true, match_score, mismatch_score)
                 .map_err(ScoringMatrixError::ParasailError)?,
         })
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    // TODO:
 }
