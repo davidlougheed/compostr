@@ -11,7 +11,7 @@ SAMPLES = 100
 
 
 def assess_compostr(seq: GeneratedSequence, motifs: list[str]):
-    d = decomposition.MotifSequenceDecomposer([s.encode("ascii") for s in motifs], 4, -5, 7, -1)
+    d = decomposition.MotifSequenceDecomposer([s.encode("ascii") for s in motifs], 4, -5, 7, False, -1)
     seq_bytes = bytes(seq)
     start = time.perf_counter()
     res = d.decompose(seq_bytes)

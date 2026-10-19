@@ -40,7 +40,7 @@ fn process_fasta(cli: &Cli) -> Result<Vec<OutputResult>, CompostrCliError> {
     let motifs: Vec<&str> = cli.motifs.iter().map(|i| i.as_str()).collect();
     let motif_set = MotifSet::new_from_strs(&motifs);
     // TODO: parameterize
-    let decomposer = MotifSequenceDecomposer::new(motif_set, 4, -4, 5, Some(-1)).unwrap();
+    let decomposer = MotifSequenceDecomposer::new(motif_set, 4, -4, 5, true, Some(-1)).unwrap();
 
     let mut reader = File::open(&cli.fasta)
         .map(BufReader::new)
