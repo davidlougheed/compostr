@@ -21,10 +21,24 @@ wheels = [
 ]
 
 [[package]]
+name = "compostr"
+source = { directory = "../compostr_py" }
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "maturin", specifier = ">=1.14.1,<1.15" },
+    { name = "pytest", specifier = ">=9.1.1" },
+]
+
+[[package]]
 name = "compostr-benchmarking"
 version = "0.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "compostr" },
+    { name = "numpy" },
     { name = "trviz" },
 ]
 
@@ -34,7 +48,11 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "trviz", specifier = ">=1.4.2" }]
+requires-dist = [
+    { name = "compostr", directory = "../compostr_py" },
+    { name = "numpy", specifier = ">=2.5.3" },
+    { name = "trviz", specifier = ">=1.4.2" },
+]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ruff", specifier = ">=0.16.10" }]

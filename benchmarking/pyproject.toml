@@ -8,6 +8,8 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "compostr",
+    "numpy>=2.5.3",
     "trviz>=1.4.2",
 ]
 
@@ -22,3 +24,6 @@ build-backend = "uv_build"
 dev = [
     "ruff>=0.16.10",
 ]
+
+[tool.uv.sources]
+compostr = { path = "../compostr_py" }
