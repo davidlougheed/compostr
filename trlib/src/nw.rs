@@ -10,9 +10,9 @@ pub enum TraceItem {
 }
 
 pub struct Alignment {
-    m_score: Array2<i32>,
-    m_trace: Array2<TraceItem>,
-    m_gap_len: Array2<i32>,
+    pub m_score: Array2<i32>,
+    pub m_trace: Array2<TraceItem>,
+    pub m_gap_len: Array2<i32>,
 }
 
 pub struct Aligner {
