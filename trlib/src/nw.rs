@@ -45,24 +45,24 @@ impl Aligner {
         for i in 1..seq_len + motif_len {
             let mut x = i;
             let mut y = 1;
-            //iterate the diagonal
+            // iterate the diagonal
             while y <= motif_len + 1 && x > 0 {
                 if x > seq_len || y > motif_len {
                     x -= 1;
                     y += 1;
                     continue;
                 }
-                //up
+                // up
                 let up = match m_trace[[x, y - 1]] {
                     TraceItem::Up | TraceItem::Left => m_score[[x, y - 1]] + self.gap_extend,
                     _ => m_score[[x, y - 1]] + self.gap_open,
                 };
-                //left
+                // left
                 let left = match m_trace[[x - 1, y]] {
                     TraceItem::Up | TraceItem::Left => m_score[[x - 1, y]] + self.gap_extend,
                     _ => m_score[[x - 1, y]] + self.gap_open,
                 };
-                //(mis)match - upleft
+                // (mis)match - upleft
                 let upleft = if motif[y - 1] == seq[x - 1] {
                     m_score[[x - 1, y - 1]] + self.match_score
                 } else {
