@@ -415,15 +415,12 @@ impl MotifSequenceDecomposer {
                 if maxopt.3 != current_op {
                     if current_op_count > 0 {
                         cigar.push(current_op.to_cigar_item(current_op_count));
-                        if current_op == AlignmentItem::Match {
-                            n_matches += current_op_count;
-                        }
+                        n_matches += current_op_count * (current_op == AlignmentItem::Match) as usize;
                     }
                     current_op = maxopt.3;
-                    current_op_count = 1;
-                } else {
-                    current_op_count += 1;
+                    current_op_count = 0;
                 }
+                current_op_count += 1;
             }
 
             // fixup cigar - we are always starting with a match or mismatch, because we get gaps at the front for free.
