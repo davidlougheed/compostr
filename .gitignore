@@ -6,3 +6,5 @@ profile.json
 
 # random outputs
 test*.json
+
+__pycache__

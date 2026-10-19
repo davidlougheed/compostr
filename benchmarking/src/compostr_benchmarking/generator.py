@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 BASES = "ACGT"
+BASES_NP = np.array(list(BASES))
 
 
 class RepeatUnit(str):
@@ -45,9 +46,10 @@ class Generator:
         while n_motifs > 0:
             ru = self.rng.choice(self.motifs, p=self.motif_probs)
             res.append(ru)
+            n_motifs -= 1
             if self.p_interruption and self.rng.random() < self.p_interruption:
                 interruption_size = self.rng.negative_binomial(self.neg_binom_r, self.neg_binom_p)
-                interruption = "".join(self.rng.choice(BASES, size=interruption_size))
+                interruption = "".join(self.rng.choice(BASES_NP, size=interruption_size))
                 res.append(Interruption(interruption))
 
         return res
