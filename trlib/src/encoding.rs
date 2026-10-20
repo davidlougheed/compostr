@@ -15,13 +15,20 @@ pub enum EncodeError {
 
 #[derive(Debug)]
 pub struct EncodeAlphabet {
-    alphabet: Vec<char>,
+    pub alphabet: Vec<char>,
     ptr: usize,
     // could maybe make keys slices if we could figure out lifetimes
     lookup: RapidHashMap<Vec<u8>, char>,
 }
 
 impl EncodeAlphabet {
+    /// Returns an Option of the char representing the specified motif.
+    pub fn get_motif_code(&self, motif: &[u8]) -> Option<char> {
+        self.lookup.get(motif).cloned()
+    }
+
+    /// Encodes the specified motif, advancing the pointer and allocating a new code from the alphabet if needed.
+    /// If the alphabet is exhausted, an error will be returned.
     pub fn encode_motif(&mut self, motif: &[u8]) -> Result<char, EncodeError> {
         if let Some(&val) = self.lookup.get(motif) {
             Ok(val)
@@ -46,8 +53,26 @@ pub struct Encoder {
 }
 
 impl Encoder {
+    pub fn new(alphabet: EncodeAlphabetParam) -> Self {
+        Encoder { alphabet }
+    }
+
+    pub fn new_from_str(alphabet_str: &str) -> Self {
+        let alphabet = EncodeAlphabetParam::NewAlphabet(alphabet_str.chars().collect());
+        Encoder { alphabet }
+    }
+
+    pub fn get_alphabet_chars(&self) -> Result<Vec<char>, EncodeError> {
+        match &self.alphabet {
+            EncodeAlphabetParam::NewAlphabet(a) => Ok(a.clone()),
+            EncodeAlphabetParam::ExistingAlphabet(a) => {
+                let al = a.lock().map_err(|_| EncodeError::MutexLockError)?;
+                Ok(al.alphabet.clone())
+            }
+        }
+    }
+
     pub fn encode(&mut self, motifs: &[&[u8]]) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet>>), EncodeError> {
-        let mut res = Vec::with_capacity(motifs.len());
         let a = match &self.alphabet {
             EncodeAlphabetParam::NewAlphabet(a) => Arc::new(Mutex::new(EncodeAlphabet {
                 alphabet: a.clone(),
@@ -58,13 +83,17 @@ impl Encoder {
         };
         let mut al = a.lock().map_err(|_| EncodeError::MutexLockError)?;
 
-        for &motif in motifs.iter() {
-            res.push(al.encode_motif(motif)?);
-        }
+        let res = motifs.iter().map(|&motif| al.encode_motif(motif)).collect::<Result<Vec<_>, _>>()?;
 
+        // Needs to occur after all encode results are collected, since that mutates the alphabet.
         self.alphabet = EncodeAlphabetParam::ExistingAlphabet(a.clone());
 
         Ok((res, a.clone()))
+    }
+
+    pub fn encode_vec_u8(&mut self, motifs: Vec<Vec<u8>>) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet>>), EncodeError> {
+        let motif_refs = motifs.iter().map(|m| m.as_slice()).collect::<Vec<&[u8]>>();
+        self.encode(&motif_refs)
     }
 
     pub fn encode_decomposition(

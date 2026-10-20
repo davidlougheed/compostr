@@ -4,6 +4,8 @@ use pyo3::prelude::*;
 mod compostr_py {
     #[pymodule_export]
     use super::decomposition;
+    #[pymodule_export]
+    use super::encoding;
 }
 
 #[pymodule(submodule, name = "decomposition")]
@@ -107,6 +109,51 @@ mod decomposition {
                         .map_err(|e| PyException::new_err(e.to_string()))?,
                 },
             )
+        }
+    }
+}
+
+#[pymodule(submodule, name = "encoding")]
+mod encoding {
+    use pyo3::exceptions::PyException;
+    use pyo3::prelude::*;
+
+    #[pyclass(name = "EncodeAlphabet")]
+    pub struct PyEncodeAlphabet {
+        inner: trlib::encoding::EncodeAlphabet,
+    }
+
+    #[pymethods]
+    impl PyEncodeAlphabet {}
+
+    #[pyclass(name = "Encoder")]
+    pub struct PyEncoder {
+        inner: trlib::encoding::Encoder,
+    }
+
+    #[pymethods]
+    impl PyEncoder {
+        #[new]
+        fn py_new(alphabet: &str) -> PyResult<Self> {
+            Ok(PyEncoder {
+                inner: trlib::encoding::Encoder::new_from_str(alphabet),
+            })
+        }
+
+        fn encode(&mut self, motifs: Vec<Vec<u8>>) -> PyResult<String> {
+            let inner_res = self
+                .inner
+                .encode_vec_u8(motifs)
+                .map_err(|e| PyException::new_err(e.to_string()))?;
+            Ok(inner_res.0.iter().cloned().collect())
+        }
+
+        fn get_alphabet_chars(&self) -> PyResult<String> {
+            let inner_res = self
+                .inner
+                .get_alphabet_chars()
+                .map_err(|e| PyException::new_err(e.to_string()))?;
+            Ok(inner_res.iter().cloned().collect())
         }
     }
 }
