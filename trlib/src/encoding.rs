@@ -16,7 +16,7 @@ pub enum EncodeError {
 #[derive(Debug)]
 pub struct EncodeAlphabet {
     pub alphabet: Vec<char>,
-    ptr: usize,
+    pub ptr: usize,
     // could maybe make keys slices if we could figure out lifetimes
     lookup: RapidHashMap<Vec<u8>, char>,
 }

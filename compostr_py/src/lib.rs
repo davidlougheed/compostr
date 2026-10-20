@@ -124,7 +124,21 @@ mod encoding {
     }
 
     #[pymethods]
-    impl PyEncodeAlphabet {}
+    impl PyEncodeAlphabet {
+        #[getter]
+        fn alphabet(&self) -> String {
+            self.inner.alphabet.iter().cloned().collect()
+        }
+
+        #[getter]
+        fn ptr(&self) -> usize {
+            self.inner.ptr
+        }
+
+        fn get_motif_code(&self, motif: &[u8]) -> Option<char> {
+            self.inner.get_motif_code(motif)
+        }
+    }
 
     #[pyclass(name = "Encoder")]
     pub struct PyEncoder {
