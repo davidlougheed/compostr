@@ -83,7 +83,10 @@ impl Encoder {
         };
         let mut al = a.lock().map_err(|_| EncodeError::MutexLockError)?;
 
-        let res = motifs.iter().map(|&motif| al.encode_motif(motif)).collect::<Result<Vec<_>, _>>()?;
+        let res = motifs
+            .iter()
+            .map(|&motif| al.encode_motif(motif))
+            .collect::<Result<Vec<_>, _>>()?;
 
         // Needs to occur after all encode results are collected, since that mutates the alphabet.
         self.alphabet = EncodeAlphabetParam::ExistingAlphabet(a.clone());
@@ -91,7 +94,10 @@ impl Encoder {
         Ok((res, a.clone()))
     }
 
-    pub fn encode_vec_u8(&mut self, motifs: Vec<Vec<u8>>) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet>>), EncodeError> {
+    pub fn encode_vec_u8(
+        &mut self,
+        motifs: Vec<Vec<u8>>,
+    ) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet>>), EncodeError> {
         let motif_refs = motifs.iter().map(|m| m.as_slice()).collect::<Vec<&[u8]>>();
         self.encode(&motif_refs)
     }
