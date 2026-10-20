@@ -16,8 +16,8 @@ plot <- ggplot(data = results, mapping = aes(x = caller, y = duration)) +
   facet_wrap(vars(repeat_type, length_label), scales = "free") +
   geom_boxplot(outlier.alpha = 0.2) +
   theme_minimal() +
-  theme(text = element_text(size = 19)) +
+  theme(text = element_text(size = 24)) +
   labs(x = "Decomposition tool", y = "Duration (s)") +
   ylim(0, NA)
 
-ggsave("../out/poster_figure.pdf", width = 12, height = 8, dpi = 300)
+ggsave("../out/poster_figure.pdf", width = 26, height = 12, dpi = 300)
