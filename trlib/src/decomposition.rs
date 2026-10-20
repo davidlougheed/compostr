@@ -39,7 +39,7 @@ impl MotifSequenceDecomposition {
         for d in self.decomposition.iter() {
             match d {
                 DecompositionItem::Alignment(a) => {
-                    cigars.extend_from_slice(&a.cigar.as_ref().ok_or(DecompositionError::NoCigarError)?);
+                    cigars.extend_from_slice(a.cigar.as_ref().ok_or(DecompositionError::NoCigarError)?);
                 }
                 DecompositionItem::Gap(g) => {
                     // Infill any gaps where we didn't decompose to any motif at all
