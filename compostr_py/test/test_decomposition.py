@@ -2,11 +2,11 @@ from compostr import decomposition
 
 
 def test_init_decomposer():
-    decomposition.MotifSequenceDecomposer([b"CAG", b"CCG"], 4, -5, 7, -1, True)
+    decomposition.MotifSequenceDecomposer([b"CAG", b"CCG"], 4, -5, 7, True, -1)
 
 
 def test_basic_decomposition():
-    d = decomposition.MotifSequenceDecomposer([b"CAG", b"CCG"], 4, -5, 7, -1, True)
+    d = decomposition.MotifSequenceDecomposer([b"CAG", b"CCG"], 4, -5, 7, True, -1)
     seq = b"CAGCAGCCGCAG"
     res = d.decompose(seq)
     assert isinstance(res, decomposition.MotifSequenceDecomposition)
