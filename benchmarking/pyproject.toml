@@ -1,0 +1,31 @@
+[project]
+name = "compostr_benchmarking"
+version = "0.0.0"
+description = "Benchmarking for the Compostr library"
+readme = "README.md"
+authors = [
+    { name = "David Lougheed", email = "david.lougheed@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "compostr",
+    "numpy>=2.5.3",
+    "polars>=2.0.0",
+    "tqdm>=4.70.1",
+    "trviz>=1.4.2",
+]
+
+[project.scripts]
+benchmarking = "compostr_benchmarking.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.10",
+]
+
+[tool.uv.sources]
+compostr = { path = "../compostr_py" }
