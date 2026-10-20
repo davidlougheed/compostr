@@ -26,13 +26,17 @@ mod decomposition {
     impl PyMotifSequenceDecomposition {
         /// Returns a vector of CIGAR items representing the alignment of a sequence just composed of motifs from the
         /// motif set against the original sequence.
-        pub fn cigar(&self) -> Vec<trlib::decomposition::CigarItem> {
-            self.inner.cigar()
+        pub fn cigar(&self) -> PyResult<Vec<trlib::decomposition::CigarItem>> {
+            self.inner
+                .cigar()
+                .map_err(|e| PyErr::new::<PyException, _>(PyException::new_err(e.to_string())))
         }
 
         /// Returns a string representation of .cigar()
-        fn cigar_string(&self) -> String {
-            self.inner.cigar_string()
+        fn cigar_string(&self) -> PyResult<String> {
+            self.inner
+                .cigar_string()
+                .map_err(|e| PyErr::new::<PyException, _>(PyException::new_err(e.to_string())))
         }
 
         /// Given the original sequence, returns the decomposition of it into sub-slices.
@@ -71,6 +75,7 @@ mod decomposition {
             match_score: i32,
             mismatch_score: i32,
             gap_penalty: i32,
+            compute_cigars: bool,
             motif_alignment_score_cutoff: Option<i32>,
         ) -> PyResult<Self> {
             Ok(PyMotifSequenceDecomposer {
@@ -80,6 +85,7 @@ mod decomposition {
                         match_score,
                         mismatch_score,
                         gap_penalty,
+                        compute_cigars,
                         motif_alignment_score_cutoff,
                     )
                     .map_err(|e| PyException::new_err(e.to_string()))?
