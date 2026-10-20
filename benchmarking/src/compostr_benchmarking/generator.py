@@ -6,6 +6,10 @@ BASES = "ACGT"
 BASES_NP = np.array(list(BASES))
 
 
+def random_dna(rng: np.random.Generator, length: int) -> str:
+    return "".join(rng.choice(BASES_NP, size=length))
+
+
 class RepeatUnit(str):
     """Representation of a repeat unit in a generated sequence"""
 
