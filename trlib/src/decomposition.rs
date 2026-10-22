@@ -618,6 +618,14 @@ mod tests {
          CAGCAGCAAGTTCAGCCGCCGCCCG",
         7,
     )]
+    #[case(
+        b"CAGCAGCAAGAAAAACAG".to_vec(),
+        vec!["CAG", "CAG", "CAAG", "A", "A", "A", "A", "A", "CAG"],
+        "CAGCAGCA-GAAAAACAG\n\
+         |||||||| |||||||||\n\
+         CAGCAGCAAGAAAAACAG",
+        9,
+    )]
     fn test_decomposition(
         #[case] seq: Vec<u8>,
         #[case] expected_decomp: Vec<&str>,
