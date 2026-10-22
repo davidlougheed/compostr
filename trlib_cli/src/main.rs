@@ -20,7 +20,7 @@ pub enum CompostrCliError {
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    #[arg(short, long, num_args=0..)]
+    #[arg(short, long, num_args=1.., required = true)]
     motifs: Vec<String>,
 
     #[arg(long)]
