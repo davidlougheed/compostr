@@ -690,6 +690,10 @@ mod tests {
     ) {
         let motif_set = MotifSet::new_from_strs(&vec!["CAG", "A"]);
         let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, true, Some(1)).unwrap();
+
+        let motif_set_inv = MotifSet::new_from_strs(&vec!["A", "CAG"]);
+        let decomposer_2 = MotifSequenceDecomposer::new(motif_set_inv, 5, -7, 4, true, Some(1)).unwrap();
+
         let res = decomposer.decompose(seq.as_slice()).unwrap();
         let expected_decomp_u8: Vec<&[u8]> = expected_decomp.iter().map(|c| c.as_bytes()).collect();
         assert_eq!(res.sequence_items(&seq, true), expected_decomp_u8);
@@ -699,6 +703,9 @@ mod tests {
         );
         assert_eq!(res.copies, expected_copies);
         eprintln!("{:?}", res.decomposition);
+
+        let res_2 = decomposer_2.decompose(seq.as_slice()).unwrap();
+        assert_eq!(res.sequence_items(&seq, true), res_2.sequence_items(&seq, true));
     }
 
     #[rstest]
