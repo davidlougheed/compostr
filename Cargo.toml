@@ -1,5 +1,5 @@
 [workspace]
-members = ["compostr_py","trlib", "trlib_cli"]
+members = ["compostr_cli", "compostr_py", "trlib"]
 resolver = "3"
 
 [profile.release]
