@@ -438,6 +438,7 @@ impl MotifSequenceDecomposer {
                 //  TODO: validate this + maybe we want to be able to have bases at the front in the seq that become part of
                 //   the motif?
                 let last = if motif[row] == seq[col] {
+                    n_matches += 1;
                     AlignmentItem::Match
                 } else {
                     AlignmentItem::Mismatch
@@ -479,7 +480,7 @@ impl MotifSequenceDecomposer {
                 len_m1: end_col - col,
                 score,
                 cigar,
-                purity: n_matches as f64 / (end_col - col) as f64,
+                purity: n_matches as f64 / (end_col + 1 - col) as f64,
                 motif_idx,
             });
         }
