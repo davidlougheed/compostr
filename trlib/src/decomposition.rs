@@ -194,28 +194,25 @@ fn backtrack_schedule(
     }
 }
 
+/// p[j] is the index of the latest interval that ends before interval j-1 begins
+#[inline]
+fn _schedule_compute_p(intervals: &[MotifAlignmentInterval]) -> Vec<usize> {
+    let mut p = vec![0; intervals.len() + 1];
+    for i in 1..intervals.len() + 1 {
+        // interval coordinates are inclusive, so use '<'
+        let start = intervals[i - 1].start;
+        p[i] = intervals.partition_point(|inter| inter.end < start);
+    }
+    p
+}
+
 /// Implementation of known weighted interval scheduling algorithm to do the motif decomposition
 /// See https://en.wikipedia.org/wiki/Interval_scheduling#Weighted
 /// Requires an input vector already sorted by end position.
 /// Returns the best (or one of the best) schedules + its score.
 fn schedule(intervals: Vec<MotifAlignmentInterval>) -> (Vec<MotifAlignmentInterval>, i32) {
-    // p[j] is the index of the latest interval that ends before interval j begins
-    let mut p = vec![0; intervals.len() + 1];
-    for i in 1..intervals.len() + 1 {
-        let mut n = i - 1;
-        loop {
-            if intervals[n].end < intervals[i - 1].start {
-                // interval coordinates are inclusive, so use '<'
-                p[i] = n + 1;
-                break;
-            }
-            if n > 0 {
-                n -= 1;
-            } else {
-                break;
-            }
-        }
-    }
+    // p[j] is the index of the latest interval that ends before interval j-1 begins
+    let p = _schedule_compute_p(&intervals);
 
     // construct:
     //  - m:  score table
