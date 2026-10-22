@@ -618,14 +618,6 @@ mod tests {
          CAGCAGCAAGTTCAGCCGCCGCCCG",
         7,
     )]
-    #[case(
-        b"CAGCAGCAAGAAAAACAG".to_vec(),
-        vec!["CAG", "CAG", "CAAG", "A", "A", "A", "A", "A", "CAG"],
-        "CAGCAGCA-GAAAAACAG\n\
-         |||||||| |||||||||\n\
-         CAGCAGCAAGAAAAACAG",
-        9,
-    )]
     fn test_decomposition(
         #[case] seq: Vec<u8>,
         #[case] expected_decomp: Vec<&str>,
@@ -678,6 +670,36 @@ mod tests {
         assert_eq!(res.copies, copies);
     }
 
+    // tests involving homopolymers
+    #[rstest]
+    #[case(b"AAA".to_vec(), vec!["A", "A", "A"], "AAA\n|||\nAAA", 3)]
+    #[case(
+        b"CAGCAGCAAGAAAAACAG".to_vec(),
+        vec!["CAG", "CAG", "CAAG", "A", "A", "A", "A", "A", "CAG"],
+        "CAGCAGCA-GAAAAACAG\n\
+         |||||||| |||||||||\n\
+         CAGCAGCAAGAAAAACAG",
+        9,
+    )]
+    fn test_decomposition_4(
+        #[case] seq: Vec<u8>,
+        #[case] expected_decomp: Vec<&str>,
+        #[case] expected_align_str: &str,
+        #[case] expected_copies: usize,
+    ) {
+        let motif_set = MotifSet::new_from_strs(&vec!["CAG", "A"]);
+        let decomposer = MotifSequenceDecomposer::new(motif_set, 5, -7, 4, true, Some(1)).unwrap();
+        let res = decomposer.decompose(seq.as_slice()).unwrap();
+        let expected_decomp_u8: Vec<&[u8]> = expected_decomp.iter().map(|c| c.as_bytes()).collect();
+        assert_eq!(res.sequence_items(&seq, true), expected_decomp_u8);
+        assert_eq!(
+            res.alignment_string(&seq).expect("should have CIGARs"),
+            expected_align_str
+        );
+        assert_eq!(res.copies, expected_copies);
+        eprintln!("{:?}", res.decomposition);
+    }
+
     #[rstest]
     #[case(
         b"TTGTTTCTTTTTTGTTTGTTTGTTTT".to_vec(),
@@ -685,7 +707,7 @@ mod tests {
     #[case(
         b"TTGTTTCTTTTTTTTTTGTTTGTTTT".to_vec(),
     )]
-    fn test_decomposition_4(#[case] seq: Vec<u8>) {
+    fn test_decomposition_5(#[case] seq: Vec<u8>) {
         // TODO: TTGT motif, homopolymer
     }
 }
