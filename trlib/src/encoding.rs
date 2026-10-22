@@ -22,6 +22,14 @@ pub struct EncodeAlphabet {
 }
 
 impl EncodeAlphabet {
+    pub fn new(alphabet: Vec<char>) -> Self {
+        EncodeAlphabet {
+            alphabet,
+            ptr: 0,
+            lookup: RapidHashMap::new(),
+        }
+    }
+
     /// Returns an Option of the char representing the specified motif.
     pub fn get_motif_code(&self, motif: &[u8]) -> Option<char> {
         self.lookup.get(motif).cloned()
@@ -62,6 +70,17 @@ impl Encoder {
         Encoder { alphabet }
     }
 
+    pub fn get_alphabet(&mut self) -> Arc<Mutex<EncodeAlphabet>> {
+        match &self.alphabet {
+            EncodeAlphabetParam::NewAlphabet(a) => {
+                let a = Arc::new(Mutex::new(EncodeAlphabet::new(a.clone())));
+                self.alphabet = EncodeAlphabetParam::ExistingAlphabet(a.clone());
+                a
+            },
+            EncodeAlphabetParam::ExistingAlphabet(a) => a.clone(),
+        }
+    }
+
     pub fn get_alphabet_chars(&self) -> Result<Vec<char>, EncodeError> {
         match &self.alphabet {
             EncodeAlphabetParam::NewAlphabet(a) => Ok(a.clone()),
@@ -72,32 +91,35 @@ impl Encoder {
         }
     }
 
-    pub fn encode(&mut self, motifs: &[&[u8]]) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet>>), EncodeError> {
-        let a = match &self.alphabet {
-            EncodeAlphabetParam::NewAlphabet(a) => Arc::new(Mutex::new(EncodeAlphabet {
-                alphabet: a.clone(),
-                ptr: 0,
-                lookup: RapidHashMap::new(),
-            })),
-            EncodeAlphabetParam::ExistingAlphabet(a) => a.clone(),
-        };
-        let mut al = a.lock().map_err(|_| EncodeError::MutexLockError)?;
+    pub fn encode(&mut self, motifs: &[&[u8]]) -> Result<Vec<char>, EncodeError> {
+        Ok(match &self.alphabet {
+            EncodeAlphabetParam::NewAlphabet(a) => {
+                let mut na = EncodeAlphabet::new(a.clone());
 
-        let res = motifs
-            .iter()
-            .map(|&motif| al.encode_motif(motif))
-            .collect::<Result<Vec<_>, _>>()?;
+                let r = motifs
+                    .iter()
+                    .map(|&motif| na.encode_motif(motif))
+                    .collect::<Result<Vec<_>, _>>()?;
 
-        // Needs to occur after all encode results are collected, since that mutates the alphabet.
-        self.alphabet = EncodeAlphabetParam::ExistingAlphabet(a.clone());
+                // Needs to occur after all encode results are collected, since that mutates the alphabet.
+                self.alphabet = EncodeAlphabetParam::ExistingAlphabet(Arc::new(Mutex::new(na)));
 
-        Ok((res, a.clone()))
+                r
+            }
+            EncodeAlphabetParam::ExistingAlphabet(a) => {
+                let mut al = a.lock().map_err(|_| EncodeError::MutexLockError)?;
+                motifs
+                    .iter()
+                    .map(|&motif| al.encode_motif(motif))
+                    .collect::<Result<Vec<_>, _>>()?
+            }
+        })
     }
 
     pub fn encode_vec_u8(
         &mut self,
         motifs: Vec<Vec<u8>>,
-    ) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet>>), EncodeError> {
+    ) -> Result<Vec<char>, EncodeError> {
         let motif_refs = motifs.iter().map(|m| m.as_slice()).collect::<Vec<&[u8]>>();
         self.encode(&motif_refs)
     }
@@ -107,7 +129,7 @@ impl Encoder {
         seq: &[u8],
         d: &MotifSequenceDecomposition,
         with_interruptions: bool,
-    ) -> Result<(Vec<char>, Arc<Mutex<EncodeAlphabet>>), EncodeError> {
+    ) -> Result<Vec<char>, EncodeError> {
         let si = d.sequence_items(seq, with_interruptions);
         self.encode(&si)
     }
@@ -128,10 +150,10 @@ mod tests {
         };
         let seq_u8: Vec<&[u8]> = seq.into_iter().map(|s| s.as_bytes()).collect();
         let res = encoder.encode(&seq_u8).expect("should work");
-        assert_eq!(res.0, end_res.chars().collect::<Vec<char>>());
+        assert_eq!(res, end_res.chars().collect::<Vec<char>>());
 
         let res2 = encoder.encode(&seq_u8).expect("should work again");
-        assert_eq!(res.0, res2.0);
+        assert_eq!(res, res2);
     }
 
     #[rstest]
@@ -160,14 +182,14 @@ mod tests {
         let seq_u8: Vec<&[u8]> = seq.into_iter().map(|s| s.as_bytes()).collect();
 
         let res1 = encoder.encode(&seq_u8).expect("res1 should work");
-        assert_eq!(res1.0, end_res_1.chars().collect::<Vec<char>>());
+        assert_eq!(res1, end_res_1.chars().collect::<Vec<char>>());
 
         let mut encoder_2 = Encoder {
-            alphabet: EncodeAlphabetParam::ExistingAlphabet(res1.1),
+            alphabet: EncodeAlphabetParam::ExistingAlphabet(encoder.get_alphabet()),
         };
 
         let seq_2_u8: Vec<&[u8]> = seq_2.into_iter().map(|s| s.as_bytes()).collect();
         let res2 = encoder_2.encode(&seq_2_u8).expect("res2 should work");
-        assert_eq!(res2.0, end_res_2.chars().collect::<Vec<char>>());
+        assert_eq!(res2, end_res_2.chars().collect::<Vec<char>>());
     }
 }

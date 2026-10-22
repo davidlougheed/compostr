@@ -159,7 +159,7 @@ mod encoding {
                 .inner
                 .encode_vec_u8(motifs)
                 .map_err(|e| PyException::new_err(e.to_string()))?;
-            Ok(inner_res.0.iter().cloned().collect())
+            Ok(inner_res.iter().cloned().collect())
         }
 
         fn get_alphabet_chars(&self) -> PyResult<String> {
