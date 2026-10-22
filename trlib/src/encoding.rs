@@ -76,7 +76,7 @@ impl Encoder {
                 let a = Arc::new(Mutex::new(EncodeAlphabet::new(a.clone())));
                 self.alphabet = EncodeAlphabetParam::ExistingAlphabet(a.clone());
                 a
-            },
+            }
             EncodeAlphabetParam::ExistingAlphabet(a) => a.clone(),
         }
     }
@@ -116,10 +116,7 @@ impl Encoder {
         })
     }
 
-    pub fn encode_vec_u8(
-        &mut self,
-        motifs: Vec<Vec<u8>>,
-    ) -> Result<Vec<char>, EncodeError> {
+    pub fn encode_vec_u8(&mut self, motifs: Vec<Vec<u8>>) -> Result<Vec<char>, EncodeError> {
         let motif_refs = motifs.iter().map(|m| m.as_slice()).collect::<Vec<&[u8]>>();
         self.encode(&motif_refs)
     }
