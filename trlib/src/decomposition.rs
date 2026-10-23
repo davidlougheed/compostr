@@ -167,13 +167,14 @@ pub struct MotifAlignmentInterval {
 }
 
 fn backtrack_schedule(
-    final_schedule: &mut Vec<MotifAlignmentInterval>,
     mut intervals: Vec<MotifAlignmentInterval>,
     m: &[i32],
     mc: &[usize],
     p: &[usize],
     mut j: usize,
-) {
+) -> Vec<MotifAlignmentInterval> {
+    let mut final_schedule: Vec<MotifAlignmentInterval> = Vec::new();
+
     while j > 0 {
         // two subcases in this check
         //  - score is strictly greater --> we take the interval
@@ -192,6 +193,10 @@ fn backtrack_schedule(
             j -= 1;
         }
     }
+
+    final_schedule.reverse();
+
+    final_schedule
 }
 
 /// p[j] is the index of the latest interval that ends before interval j-1 begins
@@ -226,14 +231,9 @@ fn schedule(intervals: Vec<MotifAlignmentInterval>) -> (Vec<MotifAlignmentInterv
         mc[i] = cmp::max(iv.len_m1, mc[i - 1]);
     }
 
-    let mut final_schedule: Vec<MotifAlignmentInterval> = Vec::new();
     let n_intervals = intervals.len();
 
-    backtrack_schedule(&mut final_schedule, intervals, &m, &mc, &p, n_intervals);
-
-    final_schedule.reverse();
-
-    (final_schedule, m[n_intervals])
+    (backtrack_schedule(intervals, &m, &mc, &p, n_intervals), m[n_intervals])
 }
 
 /// Given a schedule of MotifAlignmentInterval, wrap with DecompositionItem::Alignment and fill in gaps with
